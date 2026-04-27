@@ -20,7 +20,7 @@ pub const CONFIG_ADDRESS: u16 = 0xCF8;
 pub const CONFIG_DATA: u16 = 0xCFC;
 
 const CONFIG_SPAGE_REG_0_OFFSET: u8 = 0x0;
-const CONFIG_SPAGE_REG_1_OFFSET: u8 = 0x4;
+// const CONFIG_SPAGE_REG_1_OFFSET: u8 = 0x4;
 const CONFIG_SPAGE_REG_2_OFFSET: u8 = 0x8;
 const CONFIG_SPAGE_REG_3_OFFSET: u8 = 0xC;
 
@@ -103,8 +103,6 @@ impl Device {
             return None;
         }
 
-        let reg_1 =
-            ConfigSpaceRegister1(unsafe { read(bus, device, function, CONFIG_SPAGE_REG_1_OFFSET) });
         let reg_2 =
             ConfigSpaceRegister2(unsafe { read(bus, device, function, CONFIG_SPAGE_REG_2_OFFSET) });
         let reg_3 =
