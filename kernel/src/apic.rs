@@ -3,7 +3,6 @@
 use {
     crate::define_interrupt_handler_with_context,
     acpi::platform::interrupt::Apic,
-    core::sync::atomic::{AtomicU64, Ordering},
     log::info,
     spin_mutex::Mutex,
     x2apic::lapic::{self, LocalApic},
@@ -16,7 +15,6 @@ pub const ERROR_INDEX: u8 = 32 + 19;
 pub const SPURIOUS_INDEX: u8 = 32 + 31;
 
 static mut LOCAL_APIC: Mutex<Option<LocalApic>> = Mutex::new(None);
-static TICKS: AtomicU64 = AtomicU64::new(0);
 
 
 pub fn init(info: Apic) {
@@ -44,7 +42,6 @@ pub fn init(info: Apic) {
 }
 
 define_interrupt_handler_with_context!(timer_interrupt_handler {
-    TICKS.fetch_add(1, Ordering::Acquire);
     end_of_interrupt();
     with_scheduler(|scheduler| scheduler.preempt_current());
 });
@@ -57,8 +54,4 @@ fn end_of_interrupt() {
             .expect("APIC initialized")
             .end_of_interrupt()
     };
-}
-
-pub fn current_tick() -> u64 {
-    TICKS.load(Ordering::Relaxed)
 }
