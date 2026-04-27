@@ -123,7 +123,7 @@ extern "x86-interrupt" fn page_fault_handler(
         });
 
         if exit_process {
-            scheduler::exit();
+            scheduler::exit(-2);
         }
 
         return;
@@ -182,7 +182,7 @@ extern "x86-interrupt" fn page_fault_handler(
     });
 
     if exit_process {
-        scheduler::exit();
+        scheduler::exit(-2);
     }
 }
 
@@ -203,7 +203,7 @@ extern "x86-interrupt" fn general_protection_fault_handler(
             "Attempted to use an I/O port without permission at `{opcode:x}` in \
             {addr_space_frame:?}",
         );
-        scheduler::exit();
+        scheduler::exit(-2);
     } else {
         panic!(
             "#GP at `{opcode:x}` in {addr_space_frame:?}{} : {stack_frame:#?}",

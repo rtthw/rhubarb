@@ -14,8 +14,12 @@ pub fn defer() {
 }
 
 /// Exit the current process.
-pub fn exit() -> ! {
+pub fn exit(code: i64) -> ! {
     unsafe {
-        core::arch::asm!("int 0x41", options(noreturn));
+        core::arch::asm!(
+            "int 0x41",
+            in("rdi") code,
+            options(noreturn),
+        );
     }
 }

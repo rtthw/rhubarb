@@ -17,7 +17,7 @@ use {
         fmt,
         sync::atomic::{AtomicU64, Ordering},
     },
-    log::{info, warn},
+    log::{debug, info, warn},
     memory_types::{PAGE_SIZE, Page, PageRange, PageTableFlags, VirtualAddress},
     spin_mutex::Mutex,
     x86_64::{
@@ -397,12 +397,14 @@ define_interrupt_handler_with_context!(exit_interrupt_handler {
     // will no longer exist within the run queue, and its allocated frames will
     // be deallocated when the address space is dropped.
 
-    kernel_address_space().enter(); // ???: Is this necessary?
-    if let Some(mut process) = with_scheduler(|scheduler| scheduler.current.take()) {
-        info!("Exiting {process} with context: {:?}", process.context.take());
-    } else {
+    let Some(mut process) = with_scheduler(|scheduler| scheduler.current.take()) else {
         unreachable!()
-    }
+    };
+    let context = process.context.take().expect("process should have a context on exit");
+    let exit_code = context.registers.rdi as i64;
+    kernel_address_space().enter();
+    info!("Exiting {process} with code: {}", exit_code);
+    debug!("CONTEXT: {context:x?}");
 
     // Immediately after this block is finished, `Scheduler::schedule_next` is
     // called to set the next execution context.
@@ -416,9 +418,9 @@ pub fn defer() {
 }
 
 /// Exit the current process.
-pub fn exit() {
+pub fn exit(code: i64) {
     unsafe {
-        core::arch::asm!("int 0x41");
+        core::arch::asm!("int 0x41", in("rdi") code);
     }
 }
 

@@ -62,7 +62,7 @@ pub fn dispatch_input_events() -> ! {
                     // window_manager::send_event(window_manager::Event::UserInput(event));
 
                     if exit {
-                        scheduler::exit();
+                        scheduler::exit(45);
                     }
                 }
             }

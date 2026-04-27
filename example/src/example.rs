@@ -95,13 +95,13 @@ pub extern "C" fn main() -> ! {
         process::defer();
     }
 
-    process::exit();
+    process::exit(0);
 }
 
 #[cfg(not(test))]
 #[panic_handler]
 pub fn panic_handler(_info: &core::panic::PanicInfo<'_>) -> ! {
-    process::exit()
+    process::exit(-1)
 }
 
 struct InputState {
