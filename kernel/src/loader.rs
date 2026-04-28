@@ -37,6 +37,7 @@ const FUNDAMENTAL_SYMBOLS: &[&str] = &[
     "memcpy",
     "memmove",
     "memset",
+    "strlen",
     "__muldf3",
     "__mulsf3",
     "__divsf3",
