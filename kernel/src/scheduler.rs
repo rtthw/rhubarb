@@ -313,7 +313,10 @@ impl Scheduler {
         address_space.map_pages(
             format!("user_stack.{id}"),
             PageRange::from_end_size(Page::containing_addr(stack_top_addr), stack_size),
-            PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE,
+            PageTableFlags::PRESENT
+                | PageTableFlags::WRITABLE
+                | PageTableFlags::USER_ACCESSIBLE
+                | PageTableFlags::NO_EXECUTE,
         );
 
         let context = ExecutionContext {
