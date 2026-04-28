@@ -124,7 +124,7 @@ fn main() -> Result<()> {
         .arg("rustc")
         .arg("--release")
         .arg("--manifest-path=kernel/Cargo.toml")
-        .arg("--target=kernel/x86_64-app.json")
+        .arg("--target=kernel/x86_64-kernel.json")
         .arg("-Zbuild-std=core,alloc")
         .arg("-Zbuild-std-features=compiler-builtins-mem")
         .arg("--")
