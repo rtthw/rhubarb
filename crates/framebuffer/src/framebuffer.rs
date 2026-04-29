@@ -59,6 +59,19 @@ impl Framebuffer {
         }
     }
 
+    pub fn with_new_addr(&self, addr: usize) -> Self {
+        Self {
+            ptr: addr as *mut u32,
+            width: self.width,
+            height: self.height,
+            format: self.format,
+        }
+    }
+
+    pub fn size_in_bytes(&self) -> usize {
+        self.width * self.height * 4
+    }
+
     pub fn contains(&self, x: i32, y: i32) -> bool {
         x >= 0 && y >= 0 && x < self.width as i32 && y < self.height as i32
     }

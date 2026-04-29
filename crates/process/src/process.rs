@@ -23,3 +23,26 @@ pub fn exit(code: i64) -> ! {
         );
     }
 }
+
+pub fn mmap(page_count: u64) -> Result<u64, MemoryMapError> {
+    let mut num: i64 = 3;
+    unsafe {
+        core::arch::asm!(
+            "int 0x42",
+            inout("rax") num,
+            in("rdi") page_count,
+            options(nostack),
+        );
+    }
+
+    if num < 0 {
+        Err(MemoryMapError::InvalidPageCount)
+    } else {
+        Ok(num as u64)
+    }
+}
+
+#[derive(Debug)]
+pub enum MemoryMapError {
+    InvalidPageCount,
+}

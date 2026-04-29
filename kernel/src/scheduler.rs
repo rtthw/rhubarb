@@ -6,11 +6,12 @@ use {
     crate::{
         KERNEL_STACK, KERNEL_STACK_SIZE, gdt,
         loader::global_loader,
-        memory::{AddressSpace, kernel_address_space},
+        memory::{AddressSpace, KernelMapping, kernel_address_space},
     },
     alloc::{
         collections::{btree_map::BTreeMap, vec_deque::VecDeque},
         string::String,
+        vec::Vec,
     },
     core::{
         arch::asm,
@@ -29,6 +30,7 @@ use {
 
 const IDLE_PROCESS_ID: u64 = 0;
 const USER_CODE_ADDR: usize = 0x4444_0000_0000;
+const USER_HEAP_ADDR: usize = 0x2222_0000_0000;
 
 pub const DEFAULT_KERNEL_STACK_SIZE: usize = PAGE_SIZE * 8;
 pub const DEFAULT_USER_STACK_SIZE: usize = PAGE_SIZE * 16;
@@ -138,6 +140,8 @@ impl Scheduler {
                     gdt::selectors().kernel_code,
                 ),
             }),
+            next_heap_page: Page::containing_addr(VirtualAddress::new(USER_HEAP_ADDR)),
+            mappings: Vec::new(),
             allow_io: true,
         });
     }
@@ -264,6 +268,8 @@ impl Scheduler {
             priority: Priority::Normal,
             address_space,
             context: Some(context),
+            next_heap_page: Page::containing_addr(VirtualAddress::new(USER_HEAP_ADDR)),
+            mappings: Vec::new(),
             allow_io: true,
         };
 
@@ -337,6 +343,8 @@ impl Scheduler {
             priority: Priority::Normal,
             address_space,
             context: Some(context),
+            next_heap_page: Page::containing_addr(VirtualAddress::new(USER_HEAP_ADDR)),
+            mappings: Vec::new(),
             allow_io,
         };
 
@@ -390,6 +398,7 @@ pub fn schedule() -> ! {
 
 pub const DEFER_INTERRUPT_NUMBER: u8 = 0x40; // TODO: Choose a less arbitrary number.
 pub const EXIT_INTERRUPT_NUMBER: u8 = 0x41;
+pub const MMAP_INTERRUPT_NUMBER: u8 = 0x42;
 
 define_interrupt_handler_with_context!(defer_interrupt_handler {
     with_scheduler(|scheduler| scheduler.preempt_current());
@@ -411,6 +420,51 @@ define_interrupt_handler_with_context!(exit_interrupt_handler {
 
     // Immediately after this block is finished, `Scheduler::schedule_next` is
     // called to set the next execution context.
+});
+
+define_interrupt_handler_with_context!(mmap_interrupt_handler {
+    kernel_address_space().enter();
+    with_scheduler(|scheduler| {
+        let Some(current) = &mut scheduler.current else {
+            unreachable!();
+        };
+        let Some(context) = &mut current.context else {
+            unreachable!();
+        };
+
+        let page_count = context.registers.rdi;
+        if page_count < 1 || page_count > 4096 {
+            // TODO: This error code should be more well-defined.
+            context.registers.rax = (-1_i64).cast_unsigned();
+        }
+
+        let pages_to_map = PageRange::from_start_len(current.next_heap_page, page_count as usize);
+        let flags = PageTableFlags::PRESENT
+            | PageTableFlags::WRITABLE
+            | PageTableFlags::USER_ACCESSIBLE
+            | PageTableFlags::NO_EXECUTE;
+        let mapping = KernelMapping::new(
+            format!("{}.heap_range.{}", current.name, current.next_heap_page.number()),
+            page_count as usize * PAGE_SIZE,
+            flags,
+        );
+
+        assert_eq!(mapping.pages.len(), pages_to_map.len());
+
+        log::trace!("Mapping {} pages into `{}`", page_count, current.name);
+
+        if mapping.map_into(&current.address_space, pages_to_map, flags).is_err() {
+            // TODO: This error code should be more well-defined.
+            context.registers.rax = (-2_i64).cast_unsigned();
+        }
+
+        // Update the current process state.
+        current.next_heap_page = pages_to_map.end;
+        current.mappings.push(mapping);
+
+        // Re-enter the user's address space and continue execution.
+        current.address_space.enter();
+    });
 });
 
 /// Defer execution to the scheduler.
@@ -445,6 +499,8 @@ struct Process {
     /// The [`ExecutionContext`] of the process. If this is `None`, the process
     /// is currently running.
     context: Option<ExecutionContext>,
+    next_heap_page: Page,
+    mappings: Vec<KernelMapping>,
     /// Whether the process is allowed to perform I/O instructions.
     allow_io: bool,
 }

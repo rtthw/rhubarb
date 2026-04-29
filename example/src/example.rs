@@ -50,6 +50,10 @@ pub extern "C" fn main() -> ! {
     }
 
     let mut framebuffer = framebuffer::Framebuffer::global().unwrap();
+
+    let bottom_fb_addr = process::mmap(framebuffer.size_in_bytes().div_ceil(4096) as u64).unwrap();
+    let mut bottom_fb = framebuffer.with_new_addr(bottom_fb_addr as usize);
+
     let display_width = framebuffer::FRAMEBUFFER_WIDTH.load(Ordering::Relaxed);
     let display_height = framebuffer::FRAMEBUFFER_HEIGHT.load(Ordering::Relaxed);
     let mut input_state = InputState {

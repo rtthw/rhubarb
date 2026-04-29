@@ -202,9 +202,9 @@ impl KernelMapping {
             size_in_bytes.div_ceil(PAGE_SIZE) * PAGE_SIZE,
             Ordering::SeqCst,
         ));
-        let pages = PageRange::from_base_size(addr, size_in_bytes);
+        let pages = PageRange::from_base_len(addr, size_in_bytes.div_ceil(PAGE_SIZE));
 
-        assert_eq!(pages.count(), size_in_bytes.div_ceil(PAGE_SIZE));
+        assert_eq!(pages.len(), size_in_bytes.div_ceil(PAGE_SIZE));
 
         kernel_address_space().map_pages(&name, pages, flags);
 
