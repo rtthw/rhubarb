@@ -451,7 +451,12 @@ define_interrupt_handler_with_context!(mmap_interrupt_handler {
 
         assert_eq!(mapping.pages.len(), pages_to_map.len());
 
-        log::trace!("Mapping {} pages into `{}`", page_count, current.name);
+        log::trace!(
+            "Mapping {} page(s) into `{}` at {:x}",
+            page_count,
+            current.name,
+            pages_to_map.start.base_addr(),
+        );
 
         if mapping.map_into(&current.address_space, pages_to_map, flags).is_err() {
             // TODO: This error code should be more well-defined.
@@ -459,6 +464,7 @@ define_interrupt_handler_with_context!(mmap_interrupt_handler {
         }
 
         // Update the current process state.
+        context.registers.rax = pages_to_map.start.base_addr().to_raw() as u64;
         current.next_heap_page = pages_to_map.end;
         current.mappings.push(mapping);
 
