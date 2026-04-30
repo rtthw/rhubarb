@@ -41,7 +41,7 @@ pub fn init(info: Apic) {
     }
 }
 
-define_interrupt_handler_with_context!(timer_interrupt_handler {
+define_interrupt_handler_with_context!(|timer_interrupt_handler| {
     end_of_interrupt();
     with_scheduler(|scheduler| scheduler.preempt_current());
 });

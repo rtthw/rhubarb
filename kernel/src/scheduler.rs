@@ -47,7 +47,7 @@ pub fn run() -> ! {
 /// the time of interruption.
 #[macro_export]
 macro_rules! define_interrupt_handler_with_context {
-    ($name:ident $body:block) => {
+    (| $name:ident | $body:block) => {
         #[unsafe(naked)]
         pub extern "x86-interrupt" fn $name(
             frame: ::x86_64::structures::idt::InterruptStackFrame,
@@ -400,11 +400,11 @@ pub const DEFER_INTERRUPT_NUMBER: u8 = 0x40; // TODO: Choose a less arbitrary nu
 pub const EXIT_INTERRUPT_NUMBER: u8 = 0x41;
 pub const MMAP_INTERRUPT_NUMBER: u8 = 0x42;
 
-define_interrupt_handler_with_context!(defer_interrupt_handler {
+define_interrupt_handler_with_context!(|defer_interrupt_handler| {
     with_scheduler(|scheduler| scheduler.preempt_current());
 });
 
-define_interrupt_handler_with_context!(exit_interrupt_handler {
+define_interrupt_handler_with_context!(|exit_interrupt_handler| {
     // Exiting the current process is as simple as dropping it. The process
     // will no longer exist within the run queue, and its allocated frames will
     // be deallocated when the address space is dropped.
@@ -412,17 +412,20 @@ define_interrupt_handler_with_context!(exit_interrupt_handler {
     let Some(mut process) = with_scheduler(|scheduler| scheduler.current.take()) else {
         unreachable!()
     };
-    let context = process.context.take().expect("process should have a context on exit");
+    let context = process
+        .context
+        .take()
+        .expect("process should have a context on exit");
     let exit_code = context.registers.rdi as i64;
     kernel_address_space().enter();
     info!("Exiting {process} with code: {}", exit_code);
     debug!("CONTEXT: {context:x?}");
 
-    // Immediately after this block is finished, `Scheduler::schedule_next` is
-    // called to set the next execution context.
+    // Immediately after this block is finished, `Scheduler::schedule_next`
+    // is called to set the next execution context.
 });
 
-define_interrupt_handler_with_context!(mmap_interrupt_handler {
+define_interrupt_handler_with_context!(|mmap_interrupt_handler| {
     kernel_address_space().enter();
     with_scheduler(|scheduler| {
         let Some(current) = &mut scheduler.current else {
@@ -444,7 +447,11 @@ define_interrupt_handler_with_context!(mmap_interrupt_handler {
             | PageTableFlags::USER_ACCESSIBLE
             | PageTableFlags::NO_EXECUTE;
         let mapping = KernelMapping::new(
-            format!("{}.heap_range.{}", current.name, current.next_heap_page.number()),
+            format!(
+                "{}.heap_range.{}",
+                current.name,
+                current.next_heap_page.number(),
+            ),
             page_count as usize * PAGE_SIZE,
             flags,
         );
@@ -458,7 +465,10 @@ define_interrupt_handler_with_context!(mmap_interrupt_handler {
             pages_to_map.start.base_addr(),
         );
 
-        if mapping.map_into(&current.address_space, pages_to_map, flags).is_err() {
+        if mapping
+            .map_into(&current.address_space, pages_to_map, flags)
+            .is_err()
+        {
             // TODO: This error code should be more well-defined.
             context.registers.rax = (-2_i64).cast_unsigned();
         }
