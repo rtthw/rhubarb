@@ -6,9 +6,6 @@ members = [
     "drivers/*",
     "example",
     "kernel",
-    "linux/init",
-    "linux/shell",
-    "linux/uapi",
     "tools/runner",
 ]
 
@@ -18,4 +15,3 @@ edition = "2024"
 
 [workspace.dependencies]
 abi = { path = "crates/abi" }
-linux-uapi = { path = "linux/uapi" }

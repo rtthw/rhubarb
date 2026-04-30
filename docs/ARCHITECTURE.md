@@ -3,11 +3,10 @@
 
 # Architecture
 
-Rhubarb consists of 3 major components:
+Rhubarb consists of 2 major components:
 
 - Bare metal operating system kernel (in [/kernel](../kernel), with a simple example program in [/example](../example)).
 - UEFI Bootloader (in [/bootloader](../bootloader)).
-- **Mostly deprecated** Linux distribution (in [/linux](../linux)).
 
 The [/crates](../crates) directory contains various crates (e.g. [`boot-info`](../crates/boot-info)) used by one or more of the major components.
 
@@ -40,4 +39,3 @@ The [/drivers](../drivers) directory contains device drivers used by the kernel.
   - [/x86-port](../drivers/x86-port) ✔️
 - [/example](../example) ✔️
 - [/kernel](../kernel) ✔️
-- [/linux](../linux) ❌

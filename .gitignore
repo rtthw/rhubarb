@@ -2,5 +2,4 @@
 /kernel/esp
 /kernel/firmware/uefi
 /kernel/tmp
-/linux/build
 /target
