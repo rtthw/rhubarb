@@ -226,10 +226,11 @@ impl PageRange {
     /// address, with the given size.
     #[inline]
     pub fn from_base_size(base: VirtualAddress, size: usize) -> Self {
-        let last = Page::containing_addr(base + size);
+        let start = Page::containing_addr(base);
+        let len = size.div_ceil(PAGE_SIZE);
         Self {
-            start: Page::containing_addr(base),
-            end: last + 1,
+            start,
+            end: start + len,
         }
     }
 
