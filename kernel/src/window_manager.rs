@@ -3,7 +3,7 @@
 use {
     crate::{BOOT_INFO, scheduler::with_scheduler},
     crossbeam_queue::ArrayQueue,
-    framebuffer::{Color, Framebuffer},
+    framebuffer::{Color, Framebuffer, Point},
     log::warn,
     memory_types::PAGE_SIZE,
 };
@@ -76,8 +76,7 @@ impl WindowManager {
                 ch,
                 Color::rgb(0xaa, 0xaa, 0xad),
                 Color::rgb(0x2B, 0x2B, 0x33),
-                10,
-                10,
+                Point::new(10, 10),
                 col,
                 0,
             );
@@ -85,8 +84,7 @@ impl WindowManager {
                 '-',
                 Color::rgb(0xaa, 0xaa, 0xad),
                 Color::rgb(0x2B, 0x2B, 0x33),
-                10,
-                10,
+                Point::new(10, 10),
                 col,
                 1,
             );
@@ -118,8 +116,7 @@ impl WindowManager {
                         ch,
                         Color::rgb(0xaa, 0xaa, 0xad),
                         Color::rgb(0x2B, 0x2B, 0x33),
-                        10,
-                        10,
+                        Point::new(10, 10),
                         start_col + col,
                         row,
                     );

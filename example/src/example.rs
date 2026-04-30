@@ -4,7 +4,7 @@
 
 use {
     core::sync::atomic::Ordering,
-    framebuffer::Color,
+    framebuffer::{Color, Point},
     input::{GLOBAL_INPUT_QUEUE, InputEvent},
 };
 
@@ -51,48 +51,56 @@ pub extern "C" fn main() -> ! {
 
     let mut framebuffer = framebuffer::Framebuffer::global().unwrap();
 
-    let bottom_fb_addr = process::mmap(framebuffer.size_in_bytes().div_ceil(4096) as u64).unwrap();
+    let mouse_fb_addr =
+        process::mmap((POINTER_WIDTH * POINTER_HEIGHT * 4).div_ceil(4096) as u64).unwrap();
+    let mut mouse_fb =
+        framebuffer::Framebuffer::new(mouse_fb_addr as usize, POINTER_WIDTH, POINTER_HEIGHT);
+    for y in 0..POINTER_HEIGHT {
+        for x in 0..POINTER_WIDTH {
+            let color = POINTER_IMAGE[x as usize][y as usize];
+            mouse_fb.draw_pixel(Point::new(x as i32, y as i32), color);
+        }
+    }
+
+    let fb_page_count = framebuffer.size_in_bytes().div_ceil(4096);
+    let bottom_fb_addr = process::mmap(fb_page_count as u64).unwrap();
     let mut bottom_fb = framebuffer.with_new_addr(bottom_fb_addr as usize);
+    bottom_fb.clear_screen(Color::rgb(0x2B, 0x2B, 0x33));
 
     let display_width = framebuffer::FRAMEBUFFER_WIDTH.load(Ordering::Relaxed);
     let display_height = framebuffer::FRAMEBUFFER_HEIGHT.load(Ordering::Relaxed);
     let mut input_state = InputState {
-        mouse_x: display_width as u32 / 2,
-        mouse_y: display_height as u32 / 2,
+        mouse_pos: Point::new(display_width as i32 / 2, display_height as i32 / 2),
     };
 
     'main_loop: loop {
         for event in GLOBAL_INPUT_QUEUE.lock().drain() {
-            match event {
+            let render = match event {
                 InputEvent::KeyPress { code } => {
                     if code == 16 {
                         break 'main_loop;
                     }
+                    false
                 }
                 InputEvent::MouseMove { delta_x, delta_y } => {
-                    let old_x = input_state.mouse_x as i32;
-                    let old_y = input_state.mouse_y as i32;
+                    input_state.mouse_pos = Point::new(
+                        0.max((display_width as i32 - 1).min(input_state.mouse_pos.x + delta_x)),
+                        0.max((display_height as i32 - 1).min(input_state.mouse_pos.y + delta_y)),
+                    );
 
-                    for y in old_y..(old_y + POINTER_HEIGHT as i32) {
-                        for x in old_x..(old_x + POINTER_WIDTH as i32) {
-                            framebuffer.draw_pixel(x, y, Color::rgb(0x2B, 0x2B, 0x33));
-                        }
-                    }
-
-                    let new_x = 0.max((display_width as i32 - 1).min(old_x + delta_x));
-                    let new_y = 0.max((display_height as i32 - 1).min(old_y + delta_y));
-
-                    for y in new_y..(new_y + POINTER_HEIGHT as i32) {
-                        for x in new_x..(new_x + POINTER_WIDTH as i32) {
-                            let color = POINTER_IMAGE[(x - new_x) as usize][(y - new_y) as usize];
-                            framebuffer.draw_pixel(x, y, color);
-                        }
-                    }
-
-                    input_state.mouse_x = new_x as u32;
-                    input_state.mouse_y = new_y as u32;
+                    true
                 }
-                _ => {}
+                _ => false,
+            };
+
+            if render {
+                framebuffer::composite(
+                    [
+                        (&mut bottom_fb, Point::ORIGIN),
+                        (&mut mouse_fb, input_state.mouse_pos),
+                    ],
+                    &mut framebuffer,
+                );
             }
         }
 
@@ -109,6 +117,5 @@ pub fn panic_handler(_info: &core::panic::PanicInfo<'_>) -> ! {
 }
 
 struct InputState {
-    mouse_x: u32,
-    mouse_y: u32,
+    mouse_pos: Point,
 }
