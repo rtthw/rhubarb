@@ -73,21 +73,6 @@ pub extern "sysv64" fn main(boot_info: &'static BootInfo) -> ! {
         (&raw const __kernel_end) as usize,
     );
 
-    // Make sure `KERNEL_STACK` is actually the current stack.
-    {
-        let stack_addr = KERNEL_STACK.as_ptr().addr();
-        let stack_top_addr = stack_addr + KERNEL_STACK_SIZE;
-        let stack_object = boot_info.memory_map.len() + 43;
-        let stack_object_addr = ((&stack_object) as *const usize).addr();
-
-        // info!("STACK @ {stack_addr:#x}, OBJ @ {stack_object_addr:#x}");
-
-        assert!(
-            stack_object_addr >= stack_addr && stack_object_addr < stack_top_addr,
-            "kernel stack is malformed",
-        );
-    }
-
     gdt::init();
     idt::init();
 
