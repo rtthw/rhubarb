@@ -672,6 +672,7 @@ pub struct MemoryTracker {
     spaces: HashMap<(String, Frame), Vec<(String, PageRange)>, rustc_hash::FxBuildHasher>,
     kernel_pages: PageRange,
     framebuffer_pages: PageRange,
+    pci_bar_pages: Vec<(String, PageRange)>,
 }
 
 impl MemoryTracker {
@@ -680,6 +681,7 @@ impl MemoryTracker {
             spaces: HashMap::with_hasher(rustc_hash::FxBuildHasher),
             kernel_pages: PageRange::new(Page::new(0), Page::new(0)),
             framebuffer_pages: PageRange::new(Page::new(0), Page::new(0)),
+            pci_bar_pages: Vec::new(),
         }
     }
 
@@ -694,17 +696,34 @@ impl MemoryTracker {
         );
     }
 
+    pub fn register_pci_bar(&mut self, name: String, pages: PageRange) {
+        self.pci_bar_pages.push((name, pages));
+        self.pci_bar_pages
+            .sort_by_key(|(_name, pages)| pages.start.base_addr());
+    }
+
     pub fn dump_info(&self) {
         debug!(
             "\n--- MEMORY AREAS ---\n    \
             {:0>16x} {:0>16x}    kernel\n    \
-            {:0>16x} {:0>16x}    framebuffer\
+            {:0>16x} {:0>16x}    framebuffer\n\
+            {}\
             \n--- ADDRESS SPACES ---\
             {}",
             self.kernel_pages.start.base_addr(),
             self.kernel_pages.end.base_addr(),
             self.framebuffer_pages.start.base_addr(),
             self.framebuffer_pages.end.base_addr(),
+            self.pci_bar_pages
+                .iter()
+                .map(|(bar_name, bar_pages)| {
+                    format!(
+                        "    {:0>16x} {:0>16x}    {bar_name}\n",
+                        bar_pages.start.base_addr(),
+                        bar_pages.end.base_addr()
+                    )
+                })
+                .collect::<String>(),
             self.spaces
                 .iter()
                 .map(|((name, frame), mappings)| {
