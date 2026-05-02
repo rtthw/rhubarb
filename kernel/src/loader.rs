@@ -718,7 +718,7 @@ impl Loader {
                 loaded_sections.insert(
                     section_index,
                     Arc::new(LoadedSection {
-                        name: rustc_demangle::demangle(name).to_string().into(),
+                        name: format!("{:#}", rustc_demangle::demangle(name)).into(),
                         kind: SectionKind::Text,
                         size: section_size,
                         addr: section_addr,
@@ -760,7 +760,7 @@ impl Loader {
                 };
 
                 let tls_section = Arc::new(LoadedSection {
-                    name: rustc_demangle::demangle(name).to_string().into(),
+                    name: format!("{:#}", rustc_demangle::demangle(name)).into(),
                     kind,
                     size: section_size,
                     addr: VirtualAddress::new(0), // See below.
@@ -812,7 +812,7 @@ impl Loader {
                 loaded_sections.insert(
                     section_index,
                     Arc::new(LoadedSection {
-                        name: rustc_demangle::demangle(name).to_string().into(),
+                        name: format!("{:#}", rustc_demangle::demangle(name)).into(),
                         kind: if is_bss {
                             SectionKind::Bss
                         } else {
@@ -854,7 +854,7 @@ impl Loader {
                 loaded_sections.insert(
                     section_index,
                     Arc::new(LoadedSection {
-                        name: rustc_demangle::demangle(name).to_string().into(),
+                        name: format!("{:#}", rustc_demangle::demangle(name)).into(),
                         kind: SectionKind::Rodata,
                         size: section_size,
                         addr: section_addr,
@@ -894,7 +894,7 @@ impl Loader {
                 loaded_sections.insert(
                     section_index,
                     Arc::new(LoadedSection {
-                        name: rustc_demangle::demangle(name).to_string().into(),
+                        name: format!("{:#}", rustc_demangle::demangle(name)).into(),
                         kind: SectionKind::Rodata,
                         size: section_size,
                         addr: section_addr,
@@ -1048,7 +1048,7 @@ impl Loader {
                                 name
                             };
 
-                            let demangled_name = rustc_demangle::demangle(name).to_string();
+                            let demangled_name = format!("{:#}", rustc_demangle::demangle(name));
 
                             let section = match self.get_or_load_section(
                                 &demangled_name,
