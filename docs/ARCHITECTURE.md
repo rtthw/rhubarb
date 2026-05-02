@@ -26,8 +26,8 @@ The [/drivers](../drivers) directory contains device drivers used by the kernel.
   - [/elf](../crates/elf) ✔️
   - [/framebuffer](../crates/framebuffer) ✔️
   - [/input](../crates/input) ✔️
-  - [/loader](../crates/loader) ✔️
   - [/log](../crates/log) ✔️
+  - [/math](../crates/math) ✔️
   - [/memory-types](../crates/memory-types) ✔️
   - [/pod](../crates/pod) ✔️
   - [/spin-mutex](../crates/spin-mutex) ✔️
