@@ -1,0 +1,9 @@
+[package]
+name = "math"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+path = "src/math.rs"
+
+[dependencies]
