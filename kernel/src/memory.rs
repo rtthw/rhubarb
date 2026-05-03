@@ -151,7 +151,6 @@ pub fn init(boot_info: &BootInfo) {
         // just manually create it here.
         FRAMEBUFFER_MAPPING = Some(KernelMapping {
             name: "framebuffer".into(),
-            addr: framebuffer_addr,
             size: framebuffer_size,
             pages: framebuffer_pages,
             flags: PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
@@ -189,7 +188,6 @@ static KERNEL_MAPPING_OFFSET: AtomicUsize = AtomicUsize::new(KERNEL_MAPPING_BASE
 #[derive(Debug)]
 pub struct KernelMapping {
     pub name: String,
-    pub addr: VirtualAddress,
     pub size: usize,
     pub pages: PageRange,
     pub flags: PageTableFlags,
@@ -210,11 +208,15 @@ impl KernelMapping {
 
         Self {
             name,
-            addr,
             size: size_in_bytes,
             pages,
             flags,
         }
+    }
+
+    #[inline]
+    pub const fn addr(&self) -> VirtualAddress {
+        self.pages.start.base_addr()
     }
 
     pub fn size(&self) -> usize {
@@ -228,7 +230,7 @@ impl KernelMapping {
             "Requested offset and length would overflow kernel mapping",
         );
 
-        let addr = self.addr + offset;
+        let addr = self.addr() + offset;
 
         unsafe { core::slice::from_raw_parts_mut(addr.to_raw() as *mut _, len) }
     }
@@ -242,7 +244,11 @@ impl KernelMapping {
             "Requested type and offset would not fit in kernel mapping",
         );
 
-        unsafe { ((self.addr + offset).to_raw() as *mut T).as_mut().unwrap() }
+        unsafe {
+            ((self.addr() + offset).to_raw() as *mut T)
+                .as_mut()
+                .unwrap()
+        }
     }
 
     /// Make this mapping available within the given [`AddressSpace`].

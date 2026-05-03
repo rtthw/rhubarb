@@ -543,7 +543,7 @@ impl Loader {
         // Map loaded sections into the object's address space.
         if let Some(mapping) = &executable_mapping {
             let pages = PageRange::from_start_len(*start_page, mapping.pages.len());
-            mappings.insert(mapping.addr);
+            mappings.insert(mapping.addr());
             mapping
                 .map_into(
                     address_space,
@@ -555,7 +555,7 @@ impl Loader {
         }
         if let Some(mapping) = &read_only_mapping {
             let pages = PageRange::from_start_len(*start_page, mapping.pages.len());
-            mappings.insert(mapping.addr);
+            mappings.insert(mapping.addr());
             mapping
                 .map_into(
                     address_space,
@@ -567,7 +567,7 @@ impl Loader {
         }
         if let Some(mapping) = &read_write_mapping {
             let pages = PageRange::from_start_len(*start_page, mapping.pages.len());
-            mappings.insert(mapping.addr);
+            mappings.insert(mapping.addr());
             mapping
                 .map_into(
                     address_space,
@@ -713,7 +713,7 @@ impl Loader {
                 // We already copied the content of all `.text` sections above, so here we just
                 // record the metadata into a new `LoadedSection` object.
                 let text_offset = section.offset() as usize;
-                let section_addr = executable_mapping.lock().addr + text_offset;
+                let section_addr = executable_mapping.lock().addr() + text_offset;
 
                 loaded_sections.insert(
                     section_index,
@@ -798,7 +798,7 @@ impl Loader {
                 }
 
                 assert!(data_offset < read_write_map_lock.size());
-                let section_addr = read_write_map_lock.addr + data_offset;
+                let section_addr = read_write_map_lock.addr() + data_offset;
 
                 let slice = read_write_map_lock.as_slice_mut(data_offset, section_size);
                 match section.get_data(&elf_file) {
@@ -840,7 +840,7 @@ impl Loader {
                 let name = symbol_name_after_prefix!(section_name, ".rodata.");
 
                 assert!(rodata_offset < read_only_map_lock.size());
-                let section_addr = read_only_map_lock.addr + rodata_offset;
+                let section_addr = read_only_map_lock.addr() + rodata_offset;
 
                 let slice = read_only_map_lock.as_slice_mut(rodata_offset, section_size);
                 match section.get_data(&elf_file) {
@@ -880,7 +880,7 @@ impl Loader {
                 }
 
                 assert!(rodata_offset < read_only_map_lock.size());
-                let section_addr = read_only_map_lock.addr + rodata_offset;
+                let section_addr = read_only_map_lock.addr() + rodata_offset;
 
                 let slice = read_only_map_lock.as_slice_mut(rodata_offset, section_size);
                 match section.get_data(&elf_file) {
@@ -915,7 +915,7 @@ impl Loader {
                 let mut read_only_map_lock = read_only_mapping.lock();
 
                 assert!(rodata_offset < read_only_map_lock.size());
-                let section_addr = read_only_map_lock.addr + rodata_offset;
+                let section_addr = read_only_map_lock.addr() + rodata_offset;
 
                 let slice = read_only_map_lock.as_slice_mut(rodata_offset, section_size);
                 match section.get_data(&elf_file) {
@@ -951,7 +951,7 @@ impl Loader {
                 let mut read_only_map_lock = read_only_mapping.lock();
 
                 assert!(rodata_offset < read_only_map_lock.size());
-                let section_addr = read_only_map_lock.addr + rodata_offset;
+                let section_addr = read_only_map_lock.addr() + rodata_offset;
 
                 let slice = read_only_map_lock.as_slice_mut(rodata_offset, section_size);
                 match section.get_data(&elf_file) {
@@ -1172,29 +1172,29 @@ fn map_dependency_sections(
     //       space.
     if let Some(exec_mapping) = dependency.executable_mapping.as_ref() {
         let exec_lock = exec_mapping.lock();
-        if !mappings.contains(&exec_lock.addr) {
+        if !mappings.contains(&exec_lock.addr()) {
             let pages = exec_lock.pages;
             let flags = exec_lock.flags;
             _ = exec_lock.map_into(address_space, pages, flags);
-            mappings.insert(exec_lock.addr);
+            mappings.insert(exec_lock.addr());
         }
     }
     if let Some(ro_mapping) = dependency.read_only_mapping.as_ref() {
         let ro_lock = ro_mapping.lock();
-        if !mappings.contains(&ro_lock.addr) {
+        if !mappings.contains(&ro_lock.addr()) {
             let pages = ro_lock.pages;
             let flags = ro_lock.flags;
             _ = ro_lock.map_into(address_space, pages, flags);
-            mappings.insert(ro_lock.addr);
+            mappings.insert(ro_lock.addr());
         }
     }
     if let Some(rw_mapping) = dependency.read_write_mapping.as_ref() {
         let rw_lock = rw_mapping.lock();
-        if !mappings.contains(&rw_lock.addr) {
+        if !mappings.contains(&rw_lock.addr()) {
             let pages = rw_lock.pages;
             let flags = rw_lock.flags;
             _ = rw_lock.map_into(address_space, pages, flags);
-            mappings.insert(rw_lock.addr);
+            mappings.insert(rw_lock.addr());
         }
     }
 

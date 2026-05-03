@@ -96,7 +96,7 @@ extern "x86-interrupt" fn page_fault_handler(
                 .current_address_space_mut()
                 .expect("should have an address space during user page fault");
             let fb_mapping = FRAMEBUFFER_MAPPING.as_mut().unwrap();
-            let fb_addr = fb_mapping.addr.to_raw();
+            let fb_addr = fb_mapping.addr().to_raw();
             let fb_mapping_end = fb_addr + fb_mapping.size;
 
             if addr >= fb_addr && addr < fb_mapping_end {
