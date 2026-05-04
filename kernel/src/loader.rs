@@ -44,16 +44,22 @@ const FUNDAMENTAL_SYMBOLS: &[&str] = &[
     "__divsf3",
     "__divdf3",
     "__eqsf2",
+    "__fixsfsi",
+    "__fixunssfdi",
     "__floatdidf",
     "__floatdisf",
+    "__floatsisf",
     "__floatundisf",
     "__gedf2",
     "__gesf2",
     "__gtsf2",
     "__muldf3",
     "__mulsf3",
+    "__nesf2",
+    "__subsf3",
     "__udivti3",
     "__umodti3",
+    "__unordsf2",
 ];
 
 static LOADER: Loader = Loader::new();
@@ -81,6 +87,29 @@ pub fn init(boot_info: &BootInfo, fs: impl FileSystem + 'static) {
             Page::containing_addr(VirtualAddress::new(0x3333_0000_0000)),
         )
         .unwrap();
+
+    // HACK: Need to add support for aliasing sections based on symbol table to
+    //       avoid having to do this.
+    let math_object = global_loader()
+        .load_object(
+            "math",
+            &AddressSpace::new("load_math", None),
+            // The actual value of this address doesn't matter.
+            Page::containing_addr(VirtualAddress::new(0x3333_0000_0000)),
+        )
+        .unwrap();
+    for name in ["__ltsf2", "__lesf2"] {
+        let lock = math_object.lock();
+        let Some(section) = lock
+            .sections
+            .values()
+            .find(|section| &*section.name == name)
+        else {
+            panic!("Couldn't find section for fundamental math symbol `{name}`");
+        };
+
+        global_loader().add_alias_to_section(name, Arc::downgrade(section));
+    }
 
     global_loader()
         .load_object(

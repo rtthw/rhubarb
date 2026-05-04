@@ -14,6 +14,7 @@ const OBJECT_SOURCES: &[(&str, &str)] = &[
     ("crates", "boot-info"),
     ("crates", "framebuffer"),
     ("crates", "input"),
+    ("crates", "math"),
     ("crates", "process"),
     ("crates", "time"),
     ("drivers", "pit"),
