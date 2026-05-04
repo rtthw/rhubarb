@@ -33,22 +33,27 @@ use {
 const AUTO_MAP_DEPENDENCIES: bool = false;
 
 const FUNDAMENTAL_SYMBOLS: &[&str] = &[
+    "fmaxf",
+    "fminf",
     "memcmp",
     "memcpy",
     "memmove",
     "memset",
     "strlen",
-    "__muldf3",
-    "__mulsf3",
+    "__addsf3",
     "__divsf3",
     "__divdf3",
-    "__udivti3",
-    "__umodti3",
+    "__eqsf2",
     "__floatdidf",
     "__floatdisf",
-    "__eqsf2",
+    "__floatundisf",
     "__gedf2",
     "__gesf2",
+    "__gtsf2",
+    "__muldf3",
+    "__mulsf3",
+    "__udivti3",
+    "__umodti3",
 ];
 
 static LOADER: Loader = Loader::new();
@@ -166,7 +171,7 @@ where
 fn init_fundamental_symbols() {
     let dummy_addr_space = AddressSpace::new("load_fundamental", None);
 
-    global_loader()
+    let object = global_loader()
         .load_object(
             "compiler_builtins",
             &dummy_addr_space,
@@ -174,12 +179,21 @@ fn init_fundamental_symbols() {
             Page::containing_addr(VirtualAddress::new(0x2222_0000_0000)),
         )
         .unwrap();
+    let object_lock = object.lock();
 
     for name in FUNDAMENTAL_SYMBOLS {
-        let Some(section) = global_loader().get_section("compiler_builtins", name) else {
+        // Some of the fundamental symbols are not global, so we need to search through
+        // the loaded object's sections because the global section map won't have
+        // non-global sections.
+        let Some(section) = object_lock
+            .sections
+            .values()
+            .find(|section| &*section.name == *name)
+        else {
             panic!("Couldn't find section for fundamental symbol `{name}`");
         };
-        global_loader().add_alias_to_section(name, section);
+
+        global_loader().add_alias_to_section(name, Arc::downgrade(section));
     }
 }
 
