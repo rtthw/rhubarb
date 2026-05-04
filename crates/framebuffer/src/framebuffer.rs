@@ -7,10 +7,8 @@ pub mod font;
 use {
     crate::font::{CHAR_HEIGHT, CHAR_WIDTH},
     boot_info::{DisplayInfo, PixelFormat},
-    core::{
-        ops::{Add, Sub},
-        sync::atomic::{AtomicUsize, Ordering},
-    },
+    core::sync::atomic::{AtomicUsize, Ordering},
+    math::{Area, Point, Size, area, point, size},
 };
 
 
@@ -88,27 +86,20 @@ impl Framebuffer {
         unsafe { core::slice::from_raw_parts_mut(self.ptr, self.width * self.height) }
     }
 
-    pub fn size(&self) -> (i32, i32) {
-        (self.width as i32, self.height as i32)
+    pub const fn area(&self) -> Area {
+        Area::from_size(self.size())
+    }
+
+    pub const fn size(&self) -> Size {
+        Size::new(self.width as f32, self.height as f32)
     }
 
     pub fn size_in_bytes(&self) -> usize {
         self.width * self.height * 4
     }
 
-    pub fn contains(&self, point: Point) -> bool {
-        point.x >= 0 && point.y >= 0 && point.x < self.width as i32 && point.y < self.height as i32
-    }
-
-    pub fn intersects(&self, x: i32, y: i32, w: usize, h: usize) -> bool {
-        x >= -(w as i32)
-            && y >= -(h as i32)
-            && x < self.width.saturating_sub(w) as i32
-            && y < self.height.saturating_sub(h) as i32
-    }
-
     pub fn point_index(&self, point: Point) -> Option<usize> {
-        if self.contains(point) {
+        if self.area().contains(point) {
             Some((self.width * point.y as usize) + point.x as usize)
         } else {
             None
@@ -124,7 +115,7 @@ impl Framebuffer {
     }
 
     pub fn draw_pixel(&mut self, point: Point, color: Color) {
-        if !self.contains(point) {
+        if !self.area().contains(point) {
             return;
         }
 
@@ -166,30 +157,35 @@ impl Framebuffer {
         ch: char,
         fg_color: Color,
         bg_color: Color,
-        point: Point,
+        pos: Point,
         col: usize,
         row: usize,
     ) {
         let ch = if ch.is_ascii() { ch } else { '?' };
 
-        let start_x = point.x + (col * CHAR_WIDTH) as i32;
-        let start_y = point.y + (row * CHAR_HEIGHT) as i32;
+        let start_x = pos.x + (col * CHAR_WIDTH) as f32;
+        let start_y = pos.y + (row * CHAR_HEIGHT) as f32;
 
-        if !self.intersects(start_x, start_y, CHAR_WIDTH, CHAR_HEIGHT) {
+        let area = area(
+            point(start_x, start_y),
+            size(CHAR_WIDTH as f32, CHAR_HEIGHT as f32),
+        );
+
+        if !self.area().intersects(&area) {
             return;
         }
 
-        let offset_x = if start_x < 0 { -start_x } else { 0 };
-        let offset_y = if start_y < 0 { -start_y } else { 0 };
+        let offset_x = if start_x < 0.0 { -start_x } else { 0.0 };
+        let offset_y = if start_y < 0.0 { -start_y } else { 0.0 };
         let mut x_add = offset_x;
         let mut y_add = offset_y;
         loop {
-            let point = Point::new(start_x + x_add, start_y + y_add);
+            let pos = point(start_x + x_add, start_y + y_add);
 
-            if self.contains(point) {
-                let color = if x_add >= 1 {
+            if self.area().contains(pos) {
+                let color = if x_add >= 1.0 {
                     // Leave a 1 pixel gap between characters.
-                    let index = x_add - 1;
+                    let index = (x_add - 1.0) as usize;
                     let font_char = font::BASIC_FONT[ch as usize][y_add as usize];
                     // The most significant bit determines whether the pixel's color belongs to the
                     // foreground or background.
@@ -201,54 +197,17 @@ impl Framebuffer {
                 } else {
                     bg_color
                 };
-                self.draw_pixel(point, color);
+                self.draw_pixel(pos, color);
             }
 
-            x_add += 1;
-            if x_add == CHAR_WIDTH as i32 || start_x + x_add == self.width as i32 {
-                y_add += 1;
-                if y_add == CHAR_HEIGHT as i32 || start_y + y_add == self.height as i32 {
+            x_add += 1.0;
+            if x_add >= CHAR_WIDTH as f32 || start_x + x_add >= self.width as f32 {
+                y_add += 1.0;
+                if y_add >= CHAR_HEIGHT as f32 || start_y + y_add >= self.height as f32 {
                     return;
                 }
                 x_add = offset_x;
             }
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct Point {
-    pub x: i32,
-    pub y: i32,
-}
-
-impl Point {
-    pub const ORIGIN: Self = Self::new(0, 0);
-
-    #[inline(always)]
-    pub const fn new(x: i32, y: i32) -> Self {
-        Self { x, y }
-    }
-}
-
-impl Sub for Point {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Self {
-            x: self.x - rhs.x,
-            y: self.y - rhs.y,
-        }
-    }
-}
-
-impl Add for Point {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self {
-            x: self.x + rhs.x,
-            y: self.y + rhs.y,
         }
     }
 }
@@ -263,39 +222,42 @@ pub fn composite<'a>(
 }
 
 fn composite_buffer(source: &Framebuffer, target: &mut Framebuffer, target_point: Point) {
-    let (target_width, target_height) = target.size();
-    let (source_width, source_height) = source.size();
+    let target_size = target.size();
+    let source_size = source.size();
 
-    let area_end = target_point + Point::new(source_width, source_height);
+    let area_end = target_point + source_size;
 
-    let target_start = Point::new(0.max(target_point.x), 0.max(target_point.y));
-    let target_end = Point::new(target_width.min(area_end.x), target_height.min(area_end.y));
-    if target_end.x < 0
-        || target_end.y < 0
-        || target_start.x > target_width
-        || target_start.y > target_height
+    let target_start = Point::new(target_point.x.max(0.0), target_point.y.max(0.0));
+    let target_end = Point::new(
+        target_size.width.min(area_end.x),
+        target_size.height.min(area_end.y),
+    );
+    if target_end.x < 0.0
+        || target_end.y < 0.0
+        || target_start.x > target_size.width
+        || target_start.y > target_size.height
     {
         return;
     }
 
     let source_start = target_start - target_point;
     let source_end = target_end - target_point;
-    if source_end.x < 0
-        || source_end.y < 0
-        || source_start.x > source_width
-        || source_start.y > source_height
+    if source_end.x < 0.0
+        || source_end.y < 0.0
+        || source_start.x > source_size.width
+        || source_start.y > source_size.height
     {
         return;
     }
 
-    let source_start_x = 0.max(source_start.x);
-    let source_start_y = 0.max(source_start.y);
+    let source_start_x = source_start.x.max(0.0);
+    let source_start_y = source_start.y.max(0.0);
 
-    let area_width = source_width.min(source_end.x) - source_start_x;
-    let area_height = source_height.min(source_end.y) - source_start_y;
+    let area_width = source_size.width.min(source_end.x) - source_start_x;
+    let area_height = source_size.height.min(source_end.y) - source_start_y;
 
-    for row_offset in 0..area_height {
-        let source_start = Point::new(source_start_x, source_start_y + row_offset);
+    for row_offset in 0..(area_height as i32) {
+        let source_start = Point::new(source_start_x, source_start_y + row_offset as f32);
         let Some(source_start_index) = source.point_index(source_start) else {
             break;
         };

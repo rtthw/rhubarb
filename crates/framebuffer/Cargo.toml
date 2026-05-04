@@ -8,3 +8,4 @@ path = "src/framebuffer.rs"
 
 [dependencies]
 boot-info = { path = "../boot-info" }
+math = { path = "../math" }

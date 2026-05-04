@@ -4,8 +4,9 @@
 
 use {
     core::sync::atomic::Ordering,
-    framebuffer::{Color, Point},
+    framebuffer::Color,
     input::{GLOBAL_INPUT_QUEUE, InputEvent},
+    math::Point,
 };
 
 const TEST_PAGE_FAULT: bool = false;
@@ -58,7 +59,7 @@ pub extern "C" fn main() -> ! {
     for y in 0..POINTER_HEIGHT {
         for x in 0..POINTER_WIDTH {
             let color = POINTER_IMAGE[x as usize][y as usize];
-            mouse_fb.draw_pixel(Point::new(x as i32, y as i32), color);
+            mouse_fb.draw_pixel(Point::new(x as f32, y as f32), color);
         }
     }
 
@@ -70,7 +71,7 @@ pub extern "C" fn main() -> ! {
     let display_width = framebuffer::FRAMEBUFFER_WIDTH.load(Ordering::Relaxed);
     let display_height = framebuffer::FRAMEBUFFER_HEIGHT.load(Ordering::Relaxed);
     let mut input_state = InputState {
-        mouse_pos: Point::new(display_width as i32 / 2, display_height as i32 / 2),
+        mouse_pos: Point::new(display_width as f32 / 2.0, display_height as f32 / 2.0),
     };
 
     'main_loop: loop {
@@ -84,8 +85,14 @@ pub extern "C" fn main() -> ! {
                 }
                 InputEvent::MouseMove { delta_x, delta_y } => {
                     input_state.mouse_pos = Point::new(
-                        0.max((display_width as i32 - 1).min(input_state.mouse_pos.x + delta_x)),
-                        0.max((display_height as i32 - 1).min(input_state.mouse_pos.y + delta_y)),
+                        0_f32.max(
+                            (display_width as f32 - 1.0)
+                                .min(input_state.mouse_pos.x + delta_x as f32),
+                        ),
+                        0_f32.max(
+                            (display_height as f32 - 1.0)
+                                .min(input_state.mouse_pos.y + delta_y as f32),
+                        ),
                     );
 
                     true

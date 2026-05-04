@@ -152,6 +152,7 @@ version = "0.1.0"
 dependencies = [
  "framebuffer",
  "input",
+ "math",
  "pit",
  "process",
  "time",
@@ -168,6 +169,7 @@ name = "framebuffer"
 version = "0.1.0"
 dependencies = [
  "boot-info",
+ "math",
 ]
 
 [[package]]
@@ -211,6 +213,7 @@ dependencies = [
  "input",
  "linked_list_allocator",
  "log 0.1.0",
+ "math",
  "memory-types",
  "pci",
  "pit",
