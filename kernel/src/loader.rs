@@ -249,14 +249,12 @@ pub struct GlobalObjectProvider {
 }
 
 impl<'a> ObjectProvider for &'a GlobalObjectProvider {
-    fn list_objects(&self, prefix: &str) -> Result<Vec<String>, &'static str> {
-        self.fs.lock().list(&format!("/{prefix}"))
-    }
-
     fn read_object(&self, name: &str) -> Result<Vec<u8>, &'static str> {
         if !name.starts_with("/") {
             let path = self
-                .list_objects(name)?
+                .fs
+                .lock()
+                .list(&format!("/{name}"))?
                 .into_iter()
                 .find(|object_name| object_name == &format!("/{name}.o"))
                 .ok_or("no object found")?;
@@ -356,10 +354,8 @@ impl SectionKind {
     }
 }
 
-/// Something capable of reading object data and listing available objects.
+/// Something capable of reading object data.
 pub trait ObjectProvider {
-    /// Get a list of object names that match the given prefix.
-    fn list_objects(&self, prefix: &str) -> Result<Vec<String>, &'static str>;
     /// Read the bytes of the object with the given name.
     fn read_object(&self, name: &str) -> Result<Vec<u8>, &'static str>;
 }
