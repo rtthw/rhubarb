@@ -156,8 +156,8 @@ impl Device {
         }
     }
 
-    pub fn capabilities(&self) -> Vec<DeviceCapability> {
-        get_capabilities(self.bus, self.device, 0)
+    pub fn capabilities(&self) -> impl Iterator<Item = DeviceCapability> {
+        CapabilityIter::new(self.bus, self.device, self.function)
     }
 
     pub fn bar(&self, slot: u8) -> Option<Bar> {
@@ -307,7 +307,7 @@ impl Debug for Device {
             .field("programming_interface", &self.interface)
             .field("interrupt_line", &self.interrupt_line)
             .field("interrupt_pin", &self.interrupt_pin)
-            .field("capabilities", &self.capabilities())
+            // .field("capabilities", &self.capabilities())
             .finish()
     }
 }
@@ -455,24 +455,40 @@ bit_field! {
 
 
 
-fn get_capabilities(bus: u8, device: u8, function: u8) -> Vec<DeviceCapability> {
-    let mut offset = {
-        let mut word = unsafe { read(bus, device, function, 0x34) };
-        word = *u32_set_bit(u32_set_bit(&mut word, 0, false), 1, false);
-        bit_range!(word[0..8]) as u8
-    };
+struct CapabilityIter {
+    bus: u8,
+    device: u8,
+    function: u8,
+    offset: u8,
+}
 
-    let mut capabilities = Vec::new();
-    while offset != 0 {
-        let word = unsafe { read(bus, device, function, offset) };
-        // FIXME: This should let the user know when it finds an invalid capability.
-        if let Some(id) = Capability::from_raw(bit_range!(word[0..8]) as u8) {
-            capabilities.push(DeviceCapability { id, offset });
+impl CapabilityIter {
+    fn new(bus: u8, device: u8, function: u8) -> Self {
+        let offset = {
+            let mut word = unsafe { read(bus, device, function, 0x34) };
+            word = *u32_set_bit(u32_set_bit(&mut word, 0, false), 1, false);
+            bit_range!(word[0..8]) as u8
+        };
+
+        Self {
+            bus,
+            device,
+            function,
+            offset,
         }
-        offset = bit_range!(word[8..16]) as u8;
     }
+}
 
-    capabilities
+impl Iterator for CapabilityIter {
+    type Item = DeviceCapability;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let offset = self.offset;
+        let word = unsafe { read(self.bus, self.device, self.function, offset) };
+        // FIXME: This should let the user know when it finds an invalid capability.
+        self.offset = bit_range!(word[8..16]) as u8;
+        Capability::from_raw(bit_range!(word[0..8]) as u8).map(|id| DeviceCapability { id, offset })
+    }
 }
 
 const fn u32_set_bit(word: &mut u32, bit: usize, value: bool) -> &mut u32 {
