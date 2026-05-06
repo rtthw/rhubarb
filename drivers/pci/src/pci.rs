@@ -27,24 +27,12 @@ const CONFIG_SPAGE_REG_3_OFFSET: u8 = 0xC;
 const NONEXISTENT_VENDOR_ID: u16 = 0xFFFF;
 
 
-pub fn enumerate_devices() -> Vec<Device> {
-    let mut devices = vec![];
-    for bus in 0..=255 {
-        for id in 0..32 {
-            if let Some(device) = Device::open(bus, id, 0) {
-                if device.header_type.multiple_functions() {
-                    for function in 1..8 {
-                        if let Some(device) = Device::open(bus, id, function) {
-                            devices.push(device);
-                        }
-                    }
-                }
-                devices.push(device);
-            }
-        }
+pub fn enumerate_devices() -> impl Iterator<Item = Device> {
+    DeviceIter {
+        bus: 0,
+        id: 0,
+        multi_function: None,
     }
-
-    devices
 }
 
 pub unsafe fn read(bus: u8, device: u8, function: u8, offset: u8) -> u32 {
@@ -454,6 +442,87 @@ bit_field! {
 }
 
 
+
+struct DeviceIter {
+    bus: u8,
+    id: u8,
+    multi_function: Option<(u8, u8, u8)>,
+}
+
+impl Iterator for DeviceIter {
+    type Item = Device;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        /*
+            This insane function is essentially an iterator version of:
+
+            let mut devices = Vec::new();
+            for bus in 0..=255 {
+                for id in 0..32 {
+                    if let Some(device) = Device::open(bus, id, 0) {
+                        if device.header_type.multiple_functions() {
+                            for function in 1..8 {
+                                if let Some(device) = Device::open(bus, id, function) {
+                                    devices.push(device);
+                                }
+                            }
+                        }
+                        devices.push(device);
+                    }
+                }
+            }
+        */
+
+        // First, read multi-function devices if necessary.
+        if let Some((bus, id, function)) = self.multi_function.take() {
+            for func in function..=7 {
+                if let Some(device) = Device::open(bus, id, func) {
+                    if func < 7 {
+                        self.multi_function = Some((bus, id, func + 1));
+                    }
+                    return Some(device);
+                }
+            }
+        }
+
+        // Finish reading the current bus.
+        if self.id <= 31 {
+            for id in self.id..=31 {
+                if let Some(device) = Device::open(self.bus, id, 0) {
+                    self.id = id + 1;
+                    if device.header_type.multiple_functions() {
+                        self.multi_function = Some((self.bus, id, 1));
+                    }
+                    return Some(device);
+                }
+            }
+        }
+
+        // Go to the next bus, the current one is done being read.
+        if self.bus < 255 {
+            self.bus += 1;
+        } else {
+            return None;
+        }
+
+        // Read the remaining addresses.
+        for bus in self.bus..=255 {
+            for id in 0..=31 {
+                if let Some(device) = Device::open(bus, id, 0) {
+                    self.bus = bus;
+                    self.id = id + 1;
+                    if device.header_type.multiple_functions() {
+                        self.multi_function = Some((bus, id, 1));
+                    }
+
+                    return Some(device);
+                }
+            }
+        }
+
+        None
+    }
+}
 
 struct CapabilityIter {
     bus: u8,
