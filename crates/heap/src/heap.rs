@@ -4,9 +4,11 @@
 
 #![no_std]
 #![allow(internal_features)]
-#![feature(rustc_attrs)]
+#![feature(rustc_attrs)] // Needed for `alloc` shim.
 
 pub extern crate alloc;
+
+mod alloc_shim;
 
 use {
     core::alloc::{GlobalAlloc, Layout},
@@ -22,19 +24,6 @@ pub fn init() -> Result<(), AllocPagesError> {
     alloc_pages(1)?;
     Ok(())
 }
-
-
-
-#[unsafe(export_name = "__rustc::__rust_no_alloc_shim_is_unstable_v2")]
-pub fn __rust_no_alloc_shim_is_unstable_v2() {}
-
-#[rustc_std_internal_symbol]
-pub fn __rust_alloc_error_handler_should_panic() -> u8 {
-    0
-}
-
-#[rustc_std_internal_symbol]
-pub fn __rust_alloc_error_handler(_size: usize, _align: usize) {}
 
 
 
