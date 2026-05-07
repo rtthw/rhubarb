@@ -1383,16 +1383,25 @@ fn allocate_section_mappings(
         (executable_len, read_only_len, read_write_len)
     };
 
-    let flags =
-        PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE;
+    let flags = PageTableFlags::PRESENT | PageTableFlags::USER_ACCESSIBLE;
 
     Ok(SectionMappings {
         executable: (executable_len > 0)
             .then(|| KernelMapping::new(format!("{object_name}.x"), executable_len, flags)),
-        read_only: (read_only_len > 0)
-            .then(|| KernelMapping::new(format!("{object_name}.r"), read_only_len, flags)),
-        read_write: (read_write_len > 0)
-            .then(|| KernelMapping::new(format!("{object_name}.w"), read_write_len, flags)),
+        read_only: (read_only_len > 0).then(|| {
+            KernelMapping::new(
+                format!("{object_name}.r"),
+                read_only_len,
+                flags | PageTableFlags::NO_EXECUTE,
+            )
+        }),
+        read_write: (read_write_len > 0).then(|| {
+            KernelMapping::new(
+                format!("{object_name}.w"),
+                read_write_len,
+                flags | PageTableFlags::WRITABLE | PageTableFlags::NO_EXECUTE,
+            )
+        }),
     })
 }
 
