@@ -135,6 +135,14 @@ pub fn init(boot_info: &BootInfo, fs: impl FileSystem + 'static) {
             Page::containing_addr(VirtualAddress::new(0x3333_0000_0000)),
         )
         .unwrap();
+    global_loader()
+        .load_object(
+            "heap",
+            &AddressSpace::new("load_heap", None),
+            // The actual value of this address doesn't matter.
+            Page::containing_addr(VirtualAddress::new(0x3333_0000_0000)),
+        )
+        .unwrap();
 
     with_sym(
         "time",
@@ -474,6 +482,19 @@ impl Loader {
     ) -> Result<Weak<LoadedSection>, &'static str> {
         if let Some(section) = self.sections.lock().get(name) {
             return Ok(section.clone());
+        }
+
+        // HACK: For some reason, the `<usize as core::fmt:Display>::fmt` symbol fails
+        //       to load. I think it's some weird edge case with object section loading.
+        if name == "<usize as core::fmt::Display>::fmt" {
+            let ref_name = "<&usize as core::fmt::Display>::fmt";
+            trace!("Adding alias `{name}` to `{ref_name}`");
+            let Some(section) = self.sections.lock().get(&*ref_name).cloned() else {
+                unreachable!();
+            };
+            self.add_alias_to_section(&name, section.clone());
+
+            return Ok(section);
         }
 
         for object_name in crate_names_in_symbol(name) {

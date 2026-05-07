@@ -13,6 +13,7 @@ use {
 const OBJECT_SOURCES: &[(&str, &str)] = &[
     ("crates", "boot-info"),
     ("crates", "framebuffer"),
+    ("crates", "heap"),
     ("crates", "input"),
     ("crates", "math"),
     ("crates", "process"),

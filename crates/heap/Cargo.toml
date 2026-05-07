@@ -1,0 +1,10 @@
+[package]
+name = "heap"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+path = "src/heap.rs"
+
+[dependencies]
+memory-types = { path = "../memory-types" }

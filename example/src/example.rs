@@ -5,6 +5,7 @@
 use {
     core::sync::atomic::Ordering,
     framebuffer::Color,
+    heap::string::ToString as _,
     input::{GLOBAL_INPUT_QUEUE, InputEvent},
     math::Point,
 };
@@ -44,6 +45,13 @@ pub extern "C" fn main() -> ! {
         unsafe {
             time::set_monotonic_clock_period(1);
         }
+    }
+
+    heap::init().unwrap();
+
+    let string = "EXAMPLE".to_string();
+    if string.chars().nth(2) != Some('A') {
+        panic!("???")
     }
 
     if !time::monotonic_clock_ready() {
