@@ -65,7 +65,7 @@ impl Point {
 
     #[inline]
     pub const fn max(self, other: Self) -> Self {
-        Self::new(self.x.min(other.x), self.y.min(other.y))
+        Self::new(self.x.max(other.x), self.y.max(other.y))
     }
 
     /// Shorthand for `self.max(min).min(max)`.

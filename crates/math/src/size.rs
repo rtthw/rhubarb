@@ -80,7 +80,7 @@ impl Size {
 
     #[inline]
     pub const fn max(self, other: Self) -> Self {
-        Self::new(self.width.min(other.width), self.height.min(other.height))
+        Self::new(self.width.max(other.width), self.height.max(other.height))
     }
 
     /// Shorthand for `self.max(min).min(max)`.
