@@ -146,20 +146,14 @@ impl Scheduler {
         });
     }
 
-    /// Get the [`AddressSpace`] of the currently running process.
-    pub fn current_address_space(&self) -> Option<&AddressSpace> {
-        self.current.as_ref().map(|proc| &proc.address_space)
+    /// Get the currently running [`Process`].
+    pub fn current_process(&self) -> Option<&Process> {
+        self.current.as_ref()
     }
 
-    /// Get a mutable reference the [`AddressSpace`] of the currently running
-    /// process.
-    pub fn current_address_space_mut(&mut self) -> Option<&mut AddressSpace> {
-        self.current.as_mut().map(|proc| &mut proc.address_space)
-    }
-
-    /// Get the [`AccessPolicy`] of the currently running process.
-    pub fn current_access_policy(&self) -> Option<AccessPolicy> {
-        self.current.as_ref().map(|proc| proc.access_policy)
+    /// Get a mutable reference the currently running [`Process`].
+    pub fn current_process_mut(&mut self) -> Option<&mut Process> {
+        self.current.as_mut()
     }
 
     fn add_to_queue(&mut self, process: Process) {
@@ -499,23 +493,23 @@ pub fn exit(code: i64) {
 
 /// The state of a running process.
 #[derive(Debug)]
-struct Process {
+pub struct Process {
     /// The ID of the process.
     id: u64,
     /// The name of the process. For user processes, this is the basename of the
     /// process's object file (e.g. "example" for "/example.o").
-    name: String,
+    pub name: String,
     /// The [`AccessPolicy`] of the process.
-    access_policy: AccessPolicy,
+    pub access_policy: AccessPolicy,
     /// The run [`Priority`] of the process.
     priority: Priority,
     /// The [`AddressSpace`] of the process. That is, everything the process can
     /// "see" in virtual memory.
-    address_space: AddressSpace,
+    pub address_space: AddressSpace,
     /// The [`ExecutionContext`] of the process. If this is `None`, the process
     /// is currently running.
     context: Option<ExecutionContext>,
-    next_heap_page: Page,
+    pub next_heap_page: Page,
     mappings: Vec<KernelMapping>,
     /// Whether the process is allowed to perform I/O instructions.
     allow_io: bool,

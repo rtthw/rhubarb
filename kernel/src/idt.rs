@@ -92,9 +92,10 @@ extern "x86-interrupt" fn page_fault_handler(
     else {
         let mut exit_process = false;
         with_scheduler(|scheduler| unsafe {
-            let address_space = scheduler
-                .current_address_space_mut()
-                .expect("should have an address space during user page fault");
+            let process = scheduler
+                .current_process_mut()
+                .expect("should have a running process during user page fault");
+            let address_space = &mut process.address_space;
             let fb_mapping = FRAMEBUFFER_MAPPING.as_mut().unwrap();
             let fb_addr = fb_mapping.addr().to_raw();
             let fb_mapping_end = fb_addr + fb_mapping.size;
@@ -135,16 +136,14 @@ extern "x86-interrupt" fn page_fault_handler(
 
     let mut exit_process = false;
     with_scheduler(|scheduler| {
-        let access_policy = scheduler
-            .current_access_policy()
-            .expect("current process should exist");
-        let address_space = scheduler
-            .current_address_space()
-            .expect("should have an address space during user page fault");
+        let process = scheduler
+            .current_process()
+            .expect("should have a running process during user page fault");
+        let address_space = &process.address_space;
         let address_space_name = address_space.name();
 
         let mapping = section.mapping.lock();
-        match access_policy {
+        match process.access_policy {
             AccessPolicy::All => {
                 if let Err(error) = mapping.map_into(address_space, mapping.pages, mapping.flags) {
                     error!(
