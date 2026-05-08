@@ -274,6 +274,34 @@ impl KernelMapping {
 
         Ok(())
     }
+
+    pub fn extend(
+        &mut self,
+        address_space: &AddressSpace,
+        user_pages: PageRange,
+    ) -> Result<(), MappingError> {
+        let new_kernel_end_page = self.pages.end + user_pages.len();
+        let kernel_pages_to_map = PageRange::new(self.pages.end, new_kernel_end_page);
+
+        kernel_address_space().map_pages_untracked(kernel_pages_to_map, self.flags);
+        address_space.map_kernel_pages_to(kernel_pages_to_map, user_pages, self.flags)?;
+
+        self.pages.end = new_kernel_end_page;
+
+        TRACKER
+            .lock()
+            .spaces
+            .entry((address_space.name.clone(), address_space.frame))
+            .and_modify(|mappings| {
+                let (_name, kernel_pages) = mappings
+                    .iter_mut()
+                    .find(|(name, _pages)| name == &self.name)
+                    .expect("mapping should be mapped and tracked in this address space");
+                kernel_pages.end = new_kernel_end_page;
+            });
+
+        Ok(())
+    }
 }
 
 
@@ -574,6 +602,19 @@ impl AddressSpace {
             .entry((self.name.clone(), self.frame))
             .or_insert(Vec::new())
             .push((name.into(), pages));
+    }
+
+    pub fn map_pages_untracked(&self, pages: PageRange, flags: PageTableFlags) {
+        let mut frame_allocator = self.frame_allocator.lock();
+        let mut page_table = self.page_table.lock();
+
+        for page in pages {
+            let frame = frame_allocator.allocate_frame().unwrap();
+            page_table
+                .map_to(page, frame, flags, &mut *frame_allocator)
+                .unwrap()
+                .flush();
+        }
     }
 
     pub fn set_flags(
