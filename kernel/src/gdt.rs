@@ -3,7 +3,7 @@
 use {
     core::ptr::addr_of,
     log::info,
-    memory_types::PAGE_SIZE,
+    memory_types::{PAGE_SIZE, POINTER_SIZE},
     x86_64::{
         VirtAddr,
         instructions::tables::load_tss,
@@ -21,8 +21,8 @@ static mut GDT: GlobalDescriptorTable = GlobalDescriptorTable::new();
 static mut TSS: Tss = Tss::new();
 static mut SELECTORS: Selectors = Selectors::NULL;
 
-const INTERRUPT_STACK_SIZE: usize = PAGE_SIZE * 8;
-const IOMAP_WIDTH: usize = ((u16::MAX as usize + 1) / 8) + 1;
+const INTERRUPT_STACK_SIZE: usize = PAGE_SIZE * 4;
+const IOMAP_WIDTH: usize = ((u16::MAX as usize + 1) / POINTER_SIZE) + 1;
 
 pub const DOUBLE_FAULT_IST: u16 = 0;
 pub const PAGE_FAULT_IST: u16 = 1;
