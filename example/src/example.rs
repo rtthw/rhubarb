@@ -47,8 +47,6 @@ pub extern "C" fn main() -> ! {
         }
     }
 
-    heap::init().unwrap();
-
     let string = "EXAMPLE".to_string();
     if string.chars().nth(2) != Some('A') {
         panic!("???")
@@ -60,10 +58,10 @@ pub extern "C" fn main() -> ! {
 
     let mut framebuffer = framebuffer::Framebuffer::global().unwrap();
 
-    let mouse_fb_addr =
-        process::mmap((POINTER_WIDTH * POINTER_HEIGHT * 4).div_ceil(4096) as u64).unwrap();
-    let mut mouse_fb =
-        framebuffer::Framebuffer::new(mouse_fb_addr as usize, POINTER_WIDTH, POINTER_HEIGHT);
+    let mouse_fb_size = POINTER_WIDTH * POINTER_HEIGHT * 4;
+    let mouse_fb_page_count = mouse_fb_size.div_ceil(4096);
+    let mouse_fb_addr = heap::BASE_ADDR + 4096;
+    let mut mouse_fb = framebuffer::Framebuffer::new(mouse_fb_addr, POINTER_WIDTH, POINTER_HEIGHT);
     for y in 0..POINTER_HEIGHT {
         for x in 0..POINTER_WIDTH {
             let color = POINTER_IMAGE[x as usize][y as usize];
@@ -71,9 +69,18 @@ pub extern "C" fn main() -> ! {
         }
     }
 
-    let fb_page_count = framebuffer.size_in_bytes().div_ceil(4096);
-    let bottom_fb_addr = process::mmap(fb_page_count as u64).unwrap();
+    // let bottom_fb_page_count = framebuffer.size_in_bytes().div_ceil(4096);
+    let bottom_fb_addr = mouse_fb_addr + (mouse_fb_page_count * 4096);
     let mut bottom_fb = framebuffer.with_new_addr(bottom_fb_addr as usize);
+
+    // HACK: We draw the bottom right pixel before doing anything with the
+    //       framebuffer to trigger a heap extension large enough to fit the full
+    //       memory range. Without this, the heap gets extended page-by-page (which
+    //       is expensive).
+    bottom_fb.draw_pixel(
+        Point::ORIGIN + bottom_fb.area().size() - Point::ONE_ONE,
+        Color::rgb(0x2B, 0x2B, 0x33),
+    );
     bottom_fb.clear_screen(Color::rgb(0x2B, 0x2B, 0x33));
 
     let display_width = framebuffer::FRAMEBUFFER_WIDTH.load(Ordering::Relaxed);

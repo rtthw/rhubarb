@@ -30,7 +30,7 @@ use {
 
 const IDLE_PROCESS_ID: u64 = 0;
 const USER_CODE_ADDR: usize = 0x4444_0000_0000;
-const USER_HEAP_ADDR: usize = 0x2222_0000_0000;
+pub const USER_HEAP_ADDR: usize = 0x2222_0000_0000;
 
 pub const DEFAULT_KERNEL_STACK_SIZE: usize = PAGE_SIZE * 8;
 pub const DEFAULT_USER_STACK_SIZE: usize = PAGE_SIZE * 16;
@@ -141,6 +141,7 @@ impl Scheduler {
                 ),
             }),
             next_heap_page: Page::containing_addr(VirtualAddress::new(USER_HEAP_ADDR)),
+            heap_mapping: None,
             mappings: Vec::new(),
             allow_io: true,
         });
@@ -263,6 +264,7 @@ impl Scheduler {
             address_space,
             context: Some(context),
             next_heap_page: Page::containing_addr(VirtualAddress::new(USER_HEAP_ADDR)),
+            heap_mapping: None,
             mappings: Vec::new(),
             allow_io: true,
         };
@@ -338,6 +340,7 @@ impl Scheduler {
             address_space,
             context: Some(context),
             next_heap_page: Page::containing_addr(VirtualAddress::new(USER_HEAP_ADDR)),
+            heap_mapping: None,
             mappings: Vec::new(),
             allow_io,
         };
@@ -510,6 +513,8 @@ pub struct Process {
     /// is currently running.
     context: Option<ExecutionContext>,
     pub next_heap_page: Page,
+    /// The [`KernelMapping`] corresponding to the process's heap.
+    pub heap_mapping: Option<KernelMapping>,
     mappings: Vec<KernelMapping>,
     /// Whether the process is allowed to perform I/O instructions.
     allow_io: bool,

@@ -4,11 +4,11 @@ use {
     crate::{
         apic, gdt,
         loader::global_loader,
-        memory::{FRAMEBUFFER_MAPPING, kernel_address_space},
-        scheduler::{self, AccessPolicy, with_scheduler},
+        memory::{FRAMEBUFFER_MAPPING, KernelMapping, kernel_address_space},
+        scheduler::{self, AccessPolicy, USER_HEAP_ADDR, with_scheduler},
     },
-    log::{error, info},
-    memory_types::{PageTableFlags, VirtualAddress},
+    log::{error, info, warn},
+    memory_types::{GIBIBYTE, PAGE_SIZE, Page, PageRange, PageTableFlags, VirtualAddress},
     x86_64::{
         registers::control::{Cr2, Cr3},
         set_general_handler,
@@ -84,6 +84,88 @@ extern "x86-interrupt" fn page_fault_handler(
 
     if !user_mode {
         panic!("#PF({error_code:?}) at {addr:#x} in {addr_space_frame:?} : {stack_frame:#?}");
+    }
+
+    // Faulting address is in the user's heap.
+    if addr >= USER_HEAP_ADDR && addr < 0x3333_0000_0000 {
+        let mut exit_process = false;
+        with_scheduler(|scheduler| {
+            let process = scheduler
+                .current_process_mut()
+                .expect("should have a running process during user page fault");
+
+            let heap_offset = addr - USER_HEAP_ADDR;
+
+            if heap_offset >= 1 * GIBIBYTE {
+                warn!(
+                    "Process `{}` tried to allocate a heap of {heap_offset} bytes, exiting...",
+                    process.name,
+                );
+                exit_process = true;
+                return;
+            }
+
+            let heap_base_page = Page::containing_addr(VirtualAddress::new(USER_HEAP_ADDR));
+            let new_heap_end_page = Page::containing_addr(VirtualAddress::new(addr)) + 1;
+            if let Some(heap_mapping) = &mut process.heap_mapping {
+                // Extend the heap mapping.
+
+                let current_heap_end_page = heap_base_page + heap_mapping.pages.len();
+                let extension_pages = PageRange::new(current_heap_end_page, new_heap_end_page);
+                assert!(extension_pages.len() > 0);
+
+                if let Err(error) = heap_mapping.extend(&process.address_space, extension_pages) {
+                    error!(
+                        "Failed to extend heap for process `{}` at {addr:x} to {:x}: {error}",
+                        process.name,
+                        new_heap_end_page.base_addr(),
+                    );
+                    exit_process = true;
+                } else {
+                    info!(
+                        "Extended heap for process `{}` at {addr:x} to {:x}",
+                        process.name,
+                        new_heap_end_page.base_addr(),
+                    );
+                }
+            } else {
+                // Create a new mapping for the heap.
+
+                let flags = PageTableFlags::PRESENT
+                    | PageTableFlags::WRITABLE
+                    | PageTableFlags::USER_ACCESSIBLE
+                    | PageTableFlags::NO_EXECUTE;
+                let mapping_size =
+                    PageRange::new(heap_base_page, new_heap_end_page).len() * PAGE_SIZE;
+                let mapping =
+                    KernelMapping::new(format!("user_heap.{}", process.name), mapping_size, flags);
+                if let Err(error) = mapping.map_into(
+                    &process.address_space,
+                    PageRange::new(heap_base_page, new_heap_end_page),
+                    flags,
+                ) {
+                    error!(
+                        "Failed to create heap for process `{}` at {addr:x} to {:x}: {error}",
+                        process.name,
+                        new_heap_end_page.base_addr(),
+                    );
+                    exit_process = true;
+                } else {
+                    info!(
+                        "Created heap for process `{}` at {addr:x} to {:x}",
+                        process.name,
+                        new_heap_end_page.base_addr(),
+                    );
+                    process.heap_mapping = Some(mapping);
+                }
+            }
+        });
+
+        if exit_process {
+            scheduler::exit(-7);
+        }
+
+        return;
     }
 
     let Some(section) = global_loader()
