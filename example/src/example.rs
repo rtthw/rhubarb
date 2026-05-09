@@ -47,6 +47,8 @@ pub extern "C" fn main() -> ! {
         }
     }
 
+    heap::init();
+
     let string = "EXAMPLE".to_string();
     if string.chars().nth(2) != Some('A') {
         panic!("???")

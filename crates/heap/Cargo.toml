@@ -8,3 +8,4 @@ path = "src/heap.rs"
 
 [dependencies]
 memory-types = { path = "../memory-types" }
+spin-mutex = { path = "../spin-mutex" }
