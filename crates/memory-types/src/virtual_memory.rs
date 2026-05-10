@@ -14,6 +14,10 @@ pub const MAX_VIRTUAL_ADDR: usize = usize::MAX; // 0xFFFF_FFFF_FFFF_FFFF
 pub const VIRTUAL_MEMORY_SHIFT: usize = 47;
 pub const VIRTUAL_MEMORY_OFFSET: usize = MAX_VIRTUAL_ADDR << VIRTUAL_MEMORY_SHIFT;
 
+const L1_INDEX_SHIFT: usize = PAGE_TABLE_OFFSET_WIDTH + PAGE_TABLE_INDEX_WIDTH * 0;
+const L2_INDEX_SHIFT: usize = PAGE_TABLE_OFFSET_WIDTH + PAGE_TABLE_INDEX_WIDTH * 1;
+const L3_INDEX_SHIFT: usize = PAGE_TABLE_OFFSET_WIDTH + PAGE_TABLE_INDEX_WIDTH * 2;
+const L4_INDEX_SHIFT: usize = PAGE_TABLE_OFFSET_WIDTH + PAGE_TABLE_INDEX_WIDTH * 3;
 
 /// A virtual memory page.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -32,6 +36,18 @@ impl Page {
         Self {
             number: addr.to_raw() / PAGE_SIZE,
         }
+    }
+
+    #[inline]
+    pub const fn from_table_indices(
+        l4_index: usize,
+        l3_index: usize,
+        l2_index: usize,
+        l1_index: usize,
+    ) -> Self {
+        Self::containing_addr(VirtualAddress::from_table_indices(
+            l4_index, l3_index, l2_index, l1_index,
+        ))
     }
 
     #[inline]
@@ -129,6 +145,21 @@ impl VirtualAddress {
     }
 
     #[inline]
+    pub const fn from_table_indices(
+        l4_index: usize,
+        l3_index: usize,
+        l2_index: usize,
+        l1_index: usize,
+    ) -> Self {
+        Self::new(
+            0 | (l4_index << L4_INDEX_SHIFT)
+                | (l3_index << L3_INDEX_SHIFT)
+                | (l2_index << L2_INDEX_SHIFT)
+                | (l1_index << L1_INDEX_SHIFT),
+        )
+    }
+
+    #[inline]
     pub const fn to_raw(self) -> usize {
         self.0
     }
@@ -160,25 +191,21 @@ impl VirtualAddress {
 
     #[inline]
     pub const fn l1_index(self) -> usize {
-        const L1_INDEX_SHIFT: usize = PAGE_TABLE_OFFSET_WIDTH + PAGE_TABLE_INDEX_WIDTH * 0;
         (self.0 >> L1_INDEX_SHIFT) % ENTRIES_PER_PAGE_TABLE
     }
 
     #[inline]
     pub const fn l2_index(self) -> usize {
-        const L2_INDEX_SHIFT: usize = PAGE_TABLE_OFFSET_WIDTH + PAGE_TABLE_INDEX_WIDTH * 1;
         (self.0 >> L2_INDEX_SHIFT) % ENTRIES_PER_PAGE_TABLE
     }
 
     #[inline]
     pub const fn l3_index(self) -> usize {
-        const L3_INDEX_SHIFT: usize = PAGE_TABLE_OFFSET_WIDTH + PAGE_TABLE_INDEX_WIDTH * 2;
         (self.0 >> L3_INDEX_SHIFT) % ENTRIES_PER_PAGE_TABLE
     }
 
     #[inline]
     pub const fn l4_index(self) -> usize {
-        const L4_INDEX_SHIFT: usize = PAGE_TABLE_OFFSET_WIDTH + PAGE_TABLE_INDEX_WIDTH * 3;
         (self.0 >> L4_INDEX_SHIFT) % ENTRIES_PER_PAGE_TABLE
     }
 }
