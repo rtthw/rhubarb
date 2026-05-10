@@ -23,12 +23,18 @@ use {
 };
 
 
-const HEAP_BASE: usize = (509 << (12 + (9 * 3))) | 0xFFFF_0000_0000_0000;
-const KERNEL_MAPPING_BASE: usize = (510 << (12 + (9 * 3))) | 0xFFFF_0000_0000_0000;
+const KERNEL_L4_INDEX: usize = 0;
+const KERNEL_HEAP_L4_INDEX: usize = 509;
+const KERNEL_MAPPING_L4_INDEX: usize = 510;
+
+pub const KERNEL_HEAP_BASE: usize =
+    VirtualAddress::from_table_indices(KERNEL_HEAP_L4_INDEX, 0, 0, 0).to_raw();
+pub const KERNEL_MAPPING_BASE: usize =
+    VirtualAddress::from_table_indices(KERNEL_MAPPING_L4_INDEX, 0, 0, 0).to_raw();
 
 #[global_allocator]
 static mut ALLOCATOR: LockedHeap = LockedHeap::empty();
-static FRAME_ALLOCATOR: Mutex<FrameAllocator> = Mutex::new(FrameAllocator::new());
+pub static FRAME_ALLOCATOR: Mutex<FrameAllocator> = Mutex::new(FrameAllocator::new());
 
 pub static mut FRAMEBUFFER_MAPPING: Option<KernelMapping> = None;
 
@@ -101,7 +107,7 @@ pub fn init(boot_info: &BootInfo) {
     );
 
     let heap_size = 32 * MEBIBYTE;
-    let heap_start = VirtualAddress::new(HEAP_BASE);
+    let heap_start = VirtualAddress::new(KERNEL_HEAP_BASE);
     let heap_pages = PageRange::from_base_size(heap_start, heap_size);
 
     // Note that we can't use `addr_space.map_pages` here because it requires a heap
@@ -134,7 +140,7 @@ pub fn init(boot_info: &BootInfo) {
     );
 
     unsafe {
-        ALLOCATOR.lock().init(HEAP_BASE, heap_size);
+        ALLOCATOR.lock().init(KERNEL_HEAP_BASE, heap_size);
     }
 
     // Make sure the heap allocator actually works.
@@ -163,21 +169,21 @@ fn initial_heap_test() {
         let object_1: Vec<u8> = vec![1, 2, 3];
         let object_1_addr = object_1.as_ptr().addr();
 
-        assert!(object_1_addr == HEAP_BASE);
+        assert!(object_1_addr == KERNEL_HEAP_BASE);
     }
 
     let object_2: Vec<u8> = vec![4, 5, 6];
     let object_2_addr = object_2.as_ptr().addr();
 
     // If object 1 failed to deallocate, then this would fail.
-    assert!(object_2_addr == HEAP_BASE);
+    assert!(object_2_addr == KERNEL_HEAP_BASE);
 
     let object_3: Vec<u8> = vec![7, 8, 9];
     let object_3_addr = object_3.as_ptr().addr();
 
     // The heap should start at `HEAP_START` and grow upwards, so this object should
     // have a higher virtual address.
-    assert!(object_3_addr > HEAP_BASE);
+    assert!(object_3_addr > KERNEL_HEAP_BASE);
 }
 
 
@@ -548,8 +554,8 @@ impl AddressSpace {
             // Make sure the kernel is accessible from this address space so when we enter
             // it we can still access memory while in ring 0.
             // TODO: The kernel should be mapped in the higher half.
-            page_table[0] = kernel_table[0].clone();
-            page_table[509] = kernel_table[509].clone();
+            page_table[KERNEL_L4_INDEX] = kernel_table[KERNEL_L4_INDEX].clone();
+            page_table[KERNEL_HEAP_L4_INDEX] = kernel_table[KERNEL_HEAP_L4_INDEX].clone();
         }
 
         Self {
