@@ -7,32 +7,47 @@ use {
     log::warn,
     memory_types::VirtualAddress,
     spin_mutex::Mutex,
-    virtio::virtio_input,
+    virtio::{virtio_gpu, virtio_input},
 };
 
 
 pub fn dispatch_input_events() -> ! {
-    let mut virtio_inputs = {
-        let virtual_to_physical_addr = |vaddr| {
-            kernel_address_space()
-                .translate_address(VirtualAddress::new(vaddr))
-                .expect("should be able to translate virtual addresses to physical ones")
-                .to_raw()
-        };
-
-        pci::enumerate_devices()
-            .into_iter()
-            .filter(|dev| dev.vendor_id == 0x1af4 && dev.device_id == 0x1040 + 18)
-            .filter_map(|pci_device| {
-                let device_num = pci_device.device;
-                virtio_input::Device::new(pci_device, &virtual_to_physical_addr)
-                    .inspect_err(|err| {
-                        warn!("Failed to create input device for PCI device #{device_num}: {err}");
-                    })
-                    .ok()
-            })
-            .collect::<Vec<_>>()
+    let virtual_to_physical_addr = |vaddr| {
+        kernel_address_space()
+            .translate_address(VirtualAddress::new(vaddr))
+            .expect("should be able to translate virtual addresses to physical ones")
+            .to_raw()
     };
+    let mut virtio_inputs = pci::enumerate_devices()
+        .into_iter()
+        .filter(|dev| dev.vendor_id == 0x1af4 && dev.device_id == 0x1040 + 18)
+        .filter_map(|pci_device| {
+            let device_num = pci_device.device;
+            virtio_input::Device::new(pci_device, &virtual_to_physical_addr)
+                .inspect_err(|err| {
+                    warn!("Failed to create input device for PCI device #{device_num}: {err}");
+                })
+                .ok()
+        })
+        .collect::<Vec<_>>();
+
+    // TEMP: This is only here for testing purposes.
+    let mut virtio_gpu = {
+        let pci_device = pci::enumerate_devices()
+            .into_iter()
+            .find(|dev| dev.vendor_id == 0x1af4 && dev.device_id == 0x1050)
+            .expect("failed to find VirtIO GPU");
+        virtio_gpu::Device::new(pci_device, &virtual_to_physical_addr).unwrap()
+    };
+
+    let display_info = virtio_gpu.display_info();
+    let display_mode = display_info.modes.iter().find(|mode| mode.enabled != 0);
+
+    log::trace!("DISPLAY_MODE: {display_mode:#?}");
+
+    let mut framebuffer = virtio_gpu::Framebuffer::new(display_mode.unwrap());
+    virtio_gpu.initialize_framebuffer(&mut framebuffer, &virtual_to_physical_addr);
+    virtio_gpu.flush(&mut framebuffer);
 
     let queue_section = global_loader()
         .get_section("input", "GLOBAL_INPUT_QUEUE")

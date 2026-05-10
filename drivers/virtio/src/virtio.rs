@@ -9,6 +9,7 @@
 
 extern crate alloc;
 
+pub mod virtio_gpu;
 pub mod virtio_input;
 
 use {
