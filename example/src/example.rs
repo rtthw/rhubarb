@@ -59,6 +59,7 @@ pub extern "C" fn main() -> ! {
     }
 
     let mut framebuffer = framebuffer::Framebuffer::global().unwrap();
+    framebuffer.clear_screen(Color::rgb(0x2B, 0x2B, 0x33));
 
     let mouse_fb_size = POINTER_WIDTH * POINTER_HEIGHT * 4;
     let mouse_fb_page_count = mouse_fb_size.div_ceil(4096);

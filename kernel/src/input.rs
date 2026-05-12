@@ -7,7 +7,7 @@ use {
     log::warn,
     memory_types::VirtualAddress,
     spin_mutex::Mutex,
-    virtio::{virtio_gpu, virtio_input},
+    virtio::virtio_input,
 };
 
 
@@ -30,24 +30,6 @@ pub fn dispatch_input_events() -> ! {
                 .ok()
         })
         .collect::<Vec<_>>();
-
-    // TEMP: This is only here for testing purposes.
-    let mut virtio_gpu = {
-        let pci_device = pci::enumerate_devices()
-            .into_iter()
-            .find(|dev| dev.vendor_id == 0x1af4 && dev.device_id == 0x1050)
-            .expect("failed to find VirtIO GPU");
-        virtio_gpu::Device::new(pci_device, &virtual_to_physical_addr).unwrap()
-    };
-
-    let display_info = virtio_gpu.display_info();
-    let display_mode = display_info.modes.iter().find(|mode| mode.enabled != 0);
-
-    log::trace!("DISPLAY_MODE: {display_mode:#?}");
-
-    let mut framebuffer = virtio_gpu::Framebuffer::new(display_mode.unwrap());
-    virtio_gpu.initialize_framebuffer(&mut framebuffer, &virtual_to_physical_addr);
-    virtio_gpu.flush(&mut framebuffer);
 
     let queue_section = global_loader()
         .get_section("input", "GLOBAL_INPUT_QUEUE")
