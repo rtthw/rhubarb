@@ -75,19 +75,6 @@ pub fn init(boot_info: &BootInfo, fs: impl FileSystem + 'static) {
 
     init_fundamental_symbols();
 
-    // FIXME: The only reason this exists is because `core` relies on a symbol
-    //        called `rust_begin_unwind`, which is only defined with the
-    //        `#[panic_handler]` lang item. When it gets loaded, it expects that
-    //        symbol to already be loaded. That's what this is doing.
-    global_loader()
-        .load_object(
-            "example_dep",
-            &AddressSpace::new("load_dep", None),
-            // The actual value of this address doesn't matter.
-            Page::containing_addr(VirtualAddress::new(0x3333_0000_0000)),
-        )
-        .unwrap();
-
     // HACK: Need to add support for aliasing sections based on symbol table to
     //       avoid having to do this.
     let math_object = global_loader()
