@@ -19,12 +19,11 @@ mod scheduler;
 mod serial;
 mod tsc;
 mod vfat;
-mod window_manager;
 
 use {
     alloc::{string::String, vec::Vec},
     boot_info::BootInfo,
-    core::{arch::asm, time::Duration},
+    core::arch::asm,
     log::{debug, info},
     memory_types::{PAGE_SIZE, PageRange, VirtualAddress},
 };
@@ -131,10 +130,6 @@ pub extern "sysv64" fn main(boot_info: &'static BootInfo) -> ! {
 
     ata::init(boot_info);
 
-    unsafe {
-        BOOT_INFO = Some(boot_info);
-    }
-
     info!("STARTUP SUCCESSFUL");
 
     // Run the example program.
@@ -145,36 +140,15 @@ pub extern "sysv64" fn main(boot_info: &'static BootInfo) -> ! {
     // Run the core kernel processes.
     scheduler::with_scheduler(|scheduler| {
         scheduler.run_kernel_process(
-            "clock_update_dispatcher",
-            dispatch_clock_updates as *const fn() -> !,
-            None,
-        )
-    });
-    scheduler::with_scheduler(|scheduler| {
-        scheduler.run_kernel_process(
             "input_event_dispatcher",
             input::dispatch_input_events as *const fn() -> !,
             Some(PAGE_SIZE * 32),
         )
     });
 
-    window_manager::init();
-
     memory::TRACKER.lock().dump_info();
 
     scheduler::run()
-}
-
-static mut BOOT_INFO: Option<&'static BootInfo> = None;
-
-fn dispatch_clock_updates() -> ! {
-    loop {
-        let start = time::now();
-        window_manager::send_event(window_manager::Event::ClockUpdate);
-        while time::now().duration_since(start) < Duration::from_secs(1) {
-            scheduler::defer();
-        }
-    }
 }
 
 #[cfg(target_os = "none")]
