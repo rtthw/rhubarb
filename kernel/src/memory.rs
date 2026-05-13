@@ -162,6 +162,44 @@ pub fn init(boot_info: &BootInfo) {
             flags: PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
         });
     }
+
+    // Register BAR memory with the global memory tracker.
+    for pci_device in pci::enumerate_devices() {
+        for slot in 0..6 {
+            if let Some(bar) = pci_device.bar(slot) {
+                let pages = match bar {
+                    pci::Bar::Mem32 {
+                        address,
+                        size,
+                        prefetchable: _,
+                    } => PageRange::from_base_size(
+                        VirtualAddress::new(address as usize),
+                        size as usize,
+                    ),
+                    pci::Bar::Mem64 {
+                        address,
+                        size,
+                        prefetchable: _,
+                    } => PageRange::from_base_size(
+                        VirtualAddress::new(address as usize),
+                        size as usize,
+                    ),
+                    pci::Bar::Io { address: _ } => {
+                        // TODO: Register I/O port addresses?
+                        continue;
+                    }
+                };
+
+                TRACKER.lock().register_pci_bar(
+                    format!(
+                        "pci_bar.{}:{}:{}.{slot}",
+                        pci_device.bus, pci_device.device, pci_device.function,
+                    ),
+                    pages,
+                );
+            }
+        }
+    }
 }
 
 fn initial_heap_test() {

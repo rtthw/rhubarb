@@ -24,8 +24,8 @@ use {
     alloc::{string::String, vec::Vec},
     boot_info::BootInfo,
     core::arch::asm,
-    log::{debug, info},
-    memory_types::{PAGE_SIZE, PageRange, VirtualAddress},
+    log::info,
+    memory_types::PAGE_SIZE,
 };
 
 
@@ -74,60 +74,9 @@ pub extern "sysv64" fn main(boot_info: &'static BootInfo) -> ! {
 
     gdt::init();
     idt::init();
-
-    memory::init(boot_info);
-
-    acpi::init(boot_info);
     tsc::init();
-
-    let pm_start = time::now();
-    if let Ok(()) = acpi::pm_timer_sleep(1_000) {
-        let dur = pm_start.elapsed();
-        debug!("`acpi::pm_timer_sleep(1ms)`\t: {dur:?}");
-    }
-    let pit_start = time::now();
-    pit::sleep(1_000);
-    let dur = pit_start.elapsed();
-    debug!("`pit::sleep(1ms)`\t\t: {dur:?}");
-
-    // Register BAR memory with the global memory tracker.
-    for pci_device in pci::enumerate_devices() {
-        for slot in 0..6 {
-            if let Some(bar) = pci_device.bar(slot) {
-                let pages = match bar {
-                    pci::Bar::Mem32 {
-                        address,
-                        size,
-                        prefetchable: _,
-                    } => PageRange::from_base_size(
-                        VirtualAddress::new(address as usize),
-                        size as usize,
-                    ),
-                    pci::Bar::Mem64 {
-                        address,
-                        size,
-                        prefetchable: _,
-                    } => PageRange::from_base_size(
-                        VirtualAddress::new(address as usize),
-                        size as usize,
-                    ),
-                    pci::Bar::Io { address: _ } => {
-                        // TODO: Register I/O port addresses?
-                        continue;
-                    }
-                };
-
-                memory::TRACKER.lock().register_pci_bar(
-                    format!(
-                        "pci_bar.{}:{}:{}.{slot}",
-                        pci_device.bus, pci_device.device, pci_device.function,
-                    ),
-                    pages,
-                );
-            }
-        }
-    }
-
+    memory::init(boot_info);
+    acpi::init(boot_info);
     ata::init(boot_info);
 
     info!("STARTUP SUCCESSFUL");
@@ -139,11 +88,7 @@ pub extern "sysv64" fn main(boot_info: &'static BootInfo) -> ! {
 
     // Run the core kernel processes.
     scheduler::with_scheduler(|scheduler| {
-        scheduler.run_kernel_process(
-            "input_event_dispatcher",
-            input::dispatch_input_events as *const fn() -> !,
-            Some(PAGE_SIZE * 32),
-        )
+        scheduler.run_kernel_process("input_dispatcher", input::dispatch_input_events as _, None);
     });
 
     memory::TRACKER.lock().dump_info();

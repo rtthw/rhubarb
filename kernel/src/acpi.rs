@@ -79,6 +79,7 @@ pub fn init(boot_info: &BootInfo) {
 const PM_TIMER_FREQ: u32 = 3579545;
 static mut PM_TIMER_PORT: Option<u16> = None;
 
+#[allow(unused)]
 pub fn pm_timer_sleep(microseconds: u32) -> Result<(), &'static str> {
     unsafe {
         let Some(port) = PM_TIMER_PORT else {
