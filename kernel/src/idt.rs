@@ -48,6 +48,10 @@ pub fn init() {
             .set_handler_fn(scheduler::exit_interrupt_handler)
             .set_privilege_level(x86_64::PrivilegeLevel::Ring3)
             .set_stack_index(gdt::USER_IST);
+        IDT[scheduler::TRANSLATE_ADDR_INTERRUPT_NUMBER]
+            .set_handler_fn(scheduler::translate_addr_interrupt_handler)
+            .set_privilege_level(x86_64::PrivilegeLevel::Ring3)
+            .set_stack_index(gdt::USER_IST);
 
         IDT.load();
     }

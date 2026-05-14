@@ -54,6 +54,10 @@ pub extern "C" fn main() -> ! {
         panic!("???")
     }
 
+    let phys_addr = process::translate_address(string.as_ptr().addr()).unwrap();
+    assert_ne!(string.as_ptr().addr(), phys_addr);
+    // assert_eq!(phys_addr, 0x232a000);
+
     if !time::monotonic_clock_ready() {
         panic!("CLOCK NOT READY");
     }

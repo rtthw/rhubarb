@@ -388,6 +388,7 @@ pub fn schedule() -> ! {
 
 pub const DEFER_INTERRUPT_NUMBER: u8 = 0x40; // TODO: Choose a less arbitrary number.
 pub const EXIT_INTERRUPT_NUMBER: u8 = 0x41;
+pub const TRANSLATE_ADDR_INTERRUPT_NUMBER: u8 = 0x42;
 
 define_interrupt_handler_with_context!(|defer_interrupt_handler| {
     with_scheduler(|scheduler| scheduler.preempt_current());
@@ -412,6 +413,30 @@ define_interrupt_handler_with_context!(|exit_interrupt_handler| {
 
     // Immediately after this block is finished, `Scheduler::schedule_next`
     // is called to set the next execution context.
+});
+
+define_interrupt_handler_with_context!(|translate_addr_interrupt_handler| {
+    with_scheduler(|scheduler| {
+        let Some(current) = &mut scheduler.current else {
+            unreachable!();
+        };
+        let Some(context) = &mut current.context else {
+            unreachable!();
+        };
+
+        // TODO: Check permissions here.
+
+        let virt_addr = VirtualAddress::new(context.registers.rdi as usize);
+        if let Some(phys_addr) = current.address_space.translate_address(virt_addr) {
+            log::trace!(
+                "Translating {virt_addr:x} >> {phys_addr:x} for `{}`",
+                current.name,
+            );
+            context.registers.rax = phys_addr.to_raw() as u64;
+        } else {
+            context.registers.rax = (-2_i64).cast_unsigned();
+        }
+    });
 });
 
 /// Defer execution to the scheduler.
