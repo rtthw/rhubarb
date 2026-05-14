@@ -10,6 +10,8 @@ SECTIONS {
     /* Start mapping at the kernel's base address. */
     . = KERNEL_BASE;
 
+    __kernel_start = .;
+
     /* Advance past the program headers... */
     . += SIZEOF_HEADERS;
 

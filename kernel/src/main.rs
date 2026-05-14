@@ -29,12 +29,14 @@ use {
 };
 
 
+// Linker offset symbols (see `../kernel_x86_64.ld`).
 unsafe extern "C" {
+    static __kernel_start: u8;
+    static __kernel_end: u8;
     static __text_start: u8;
     static __text_end: u8;
     static __rodata_start: u8;
     static __rodata_end: u8;
-    static __kernel_end: u8;
 }
 
 /// The kernel's entry point.
@@ -62,14 +64,15 @@ pub extern "sysv64" fn main(boot_info: &'static BootInfo) -> ! {
 
     info!(
         "KERNEL STARTUP @ {startup_time}\n\
+        \trange: {:#x}..{:#x}\n\
         \ttext: {:#x}..{:#x}\n\
-        \trodata: {:#x}..{:#x}\n\
-        \tend: {:#x}",
+        \trodata: {:#x}..{:#x}",
+        (&raw const __kernel_start) as usize,
+        (&raw const __kernel_end) as usize,
         (&raw const __text_start) as usize,
         (&raw const __text_end) as usize,
         (&raw const __rodata_start) as usize,
         (&raw const __rodata_end) as usize,
-        (&raw const __kernel_end) as usize,
     );
 
     gdt::init();
