@@ -19,10 +19,13 @@ pub use {pci_capability::*, pci_class::*};
 pub const CONFIG_ADDRESS: u16 = 0xCF8;
 pub const CONFIG_DATA: u16 = 0xCFC;
 
-const CONFIG_SPAGE_REG_0_OFFSET: u8 = 0x0;
-// const CONFIG_SPAGE_REG_1_OFFSET: u8 = 0x4;
-const CONFIG_SPAGE_REG_2_OFFSET: u8 = 0x8;
-const CONFIG_SPAGE_REG_3_OFFSET: u8 = 0xC;
+const CONFIG_SPAGE_REG_0_OFFSET: u8 = 0x00;
+// const CONFIG_SPAGE_REG_1_OFFSET: u8 = 0x04;
+const CONFIG_SPAGE_REG_2_OFFSET: u8 = 0x08;
+const CONFIG_SPAGE_REG_3_OFFSET: u8 = 0x0C;
+// const CONFIG_SPAGE_REG_4_OFFSET: u8 = 0x10;
+// const CONFIG_SPAGE_REG_5_OFFSET: u8 = 0x14;
+const CONFIG_SPAGE_REG_6_OFFSET: u8 = 0x18;
 
 const NONEXISTENT_VENDOR_ID: u16 = 0xFFFF;
 
@@ -150,6 +153,12 @@ impl Device {
 
     pub fn bar(&self, slot: u8) -> Option<Bar> {
         if slot >= 6 {
+            return None;
+        }
+
+        // If this is a non PCI-to-PCI bridge device or the slot is greater than 1,
+        // there is no BAR to read.
+        if self.class == Class::BridgeDevice && (!self.header_type.is_pci_bridge() || slot >= 2) {
             return None;
         }
 
@@ -284,6 +293,21 @@ impl Debug for Device {
             .field("subclass", &self.subclass)
             .field("header_type", &self.header_type);
 
+        if self.class == Class::BridgeDevice {
+            let reg_6 = ConfigSpaceRegister6(unsafe {
+                read(
+                    self.bus,
+                    self.device,
+                    self.function,
+                    CONFIG_SPAGE_REG_6_OFFSET,
+                )
+            });
+            debug_struct.field("primary_bus", &reg_6.primary_bus_number());
+            debug_struct.field("secondary_bus", &reg_6.secondary_bus_number());
+            debug_struct.field("subordinate_bus", &reg_6.subordinate_bus_number());
+            debug_struct.field("secondary_latency", &reg_6.secondary_latency_timer());
+        }
+
         for slot in 0..6 {
             let Some(bar) = self.bar(slot) else {
                 continue;
@@ -331,6 +355,15 @@ bit_field! {
         latency_timer: u8 = 8..16,
         header_type: u8 = 16..24,
         bist: u8 = 24..32,
+    }
+}
+
+bit_field! {
+    struct ConfigSpaceRegister6: u32 {
+        primary_bus_number: u8 = 0..8,
+        secondary_bus_number: u8 = 8..16,
+        subordinate_bus_number: u8 = 16..24,
+        secondary_latency_timer: u8 = 24..32,
     }
 }
 
