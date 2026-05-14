@@ -10,9 +10,6 @@ use {
     math::Point,
 };
 
-const TEST_PAGE_FAULT: bool = false;
-const TEST_WRITE_TIME: bool = false;
-
 const POINTER_HEIGHT: usize = 16;
 const POINTER_WIDTH: usize = 10;
 static POINTER_IMAGE: [[Color; POINTER_HEIGHT]; POINTER_WIDTH] = {
@@ -35,18 +32,6 @@ static POINTER_IMAGE: [[Color; POINTER_HEIGHT]; POINTER_WIDTH] = {
 };
 
 pub extern "C" fn main() -> ! {
-    if TEST_PAGE_FAULT {
-        let ptr = 0xab0de as *mut u8;
-        unsafe {
-            ptr.write(43);
-        }
-    }
-    if TEST_WRITE_TIME {
-        unsafe {
-            time::set_monotonic_clock_period(1);
-        }
-    }
-
     heap::init();
 
     let string = "EXAMPLE".to_string();
