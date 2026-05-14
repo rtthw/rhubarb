@@ -32,7 +32,7 @@ pub fn dispatch_input_events() -> ! {
         .collect::<Vec<_>>();
 
     let queue_section = global_loader()
-        .get_section("input", "GLOBAL_INPUT_QUEUE")
+        .get_section("input::GLOBAL_INPUT_QUEUE")
         .unwrap()
         .upgrade()
         .unwrap();

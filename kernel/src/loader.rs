@@ -131,18 +131,16 @@ pub fn init(boot_info: &BootInfo, fs: impl FileSystem + 'static) {
         )
         .unwrap();
 
-    with_sym(
-        "time",
-        "MONOTONIC_PERIOD",
+    with_symbol_value(
+        "time::MONOTONIC_PERIOD",
         |mono_period: &mut AtomicU64| unsafe {
             assert_eq!(mono_period.load(Ordering::SeqCst), 1);
             mono_period.store(crate::tsc::TSC_PERIOD, Ordering::SeqCst);
             assert_eq!(mono_period.load(Ordering::SeqCst), crate::tsc::TSC_PERIOD);
         },
     );
-    with_sym(
-        "framebuffer",
-        "FRAMEBUFFER_ADDR",
+    with_symbol_value(
+        "framebuffer::FRAMEBUFFER_ADDR",
         |fb_addr: &mut AtomicUsize| {
             assert_eq!(fb_addr.load(Ordering::SeqCst), 0);
             fb_addr.store(
@@ -151,25 +149,22 @@ pub fn init(boot_info: &BootInfo, fs: impl FileSystem + 'static) {
             );
         },
     );
-    with_sym(
-        "framebuffer",
-        "FRAMEBUFFER_SIZE",
+    with_symbol_value(
+        "framebuffer::FRAMEBUFFER_SIZE",
         |fb_size: &mut AtomicUsize| {
             assert_eq!(fb_size.load(Ordering::SeqCst), 0);
             fb_size.store(boot_info.display_info.framebuffer_size, Ordering::SeqCst);
         },
     );
-    with_sym(
-        "framebuffer",
-        "FRAMEBUFFER_WIDTH",
+    with_symbol_value(
+        "framebuffer::FRAMEBUFFER_WIDTH",
         |fb_width: &mut AtomicUsize| {
             assert_eq!(fb_width.load(Ordering::SeqCst), 0);
             fb_width.store(boot_info.display_info.stride as usize, Ordering::SeqCst);
         },
     );
-    with_sym(
-        "framebuffer",
-        "FRAMEBUFFER_HEIGHT",
+    with_symbol_value(
+        "framebuffer::FRAMEBUFFER_HEIGHT",
         |fb_height: &mut AtomicUsize| {
             assert_eq!(fb_height.load(Ordering::SeqCst), 0);
             fb_height.store(boot_info.display_info.height as usize, Ordering::SeqCst);
@@ -179,14 +174,12 @@ pub fn init(boot_info: &BootInfo, fs: impl FileSystem + 'static) {
     // global_loader().dump_info();
 }
 
-fn with_sym<T, F>(section_prefix: &str, section_suffix: &str, op: F)
+fn with_symbol_value<T, F>(name: &str, op: F)
 where
     T: Sized,
     F: FnOnce(&mut T),
 {
-    let sym = global_loader()
-        .get_section(section_prefix, section_suffix)
-        .unwrap();
+    let sym = global_loader().get_section(name).unwrap();
     let value = sym.upgrade().unwrap();
     let mut mapping = value.mapping.lock();
     op(unsafe { mapping.as_mut::<T>(value.mapping_offset) });
@@ -425,12 +418,12 @@ impl Loader {
 
     /// Get the first [section](LoadedSection) that starts with the given prefix
     /// and ends with the given suffix.
-    pub fn get_section(&self, prefix: &str, suffix: &str) -> Option<Weak<LoadedSection>> {
+    pub fn get_section(&self, name: &str) -> Option<Weak<LoadedSection>> {
         self.sections
             .lock()
             .iter()
-            .find(|(name, _section)| name.starts_with(prefix) && name.ends_with(suffix))
-            .map(|(_name, section)| section.clone())
+            .find(|(section_name, _section)| &***section_name == name)
+            .map(|(_section_name, section)| section.clone())
     }
 
     /// Get the first text [section](LoadedSection) that starts with the given
