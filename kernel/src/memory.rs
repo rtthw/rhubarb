@@ -165,8 +165,15 @@ pub fn init(boot_info: &BootInfo) {
 
     // Register BAR memory with the global memory tracker.
     for pci_device in pci::enumerate_devices() {
+        // log::trace!("PCI {pci_device:#x?}");
+        let mut prev_was_64 = false;
         for slot in 0..6 {
+            if prev_was_64 {
+                prev_was_64 = false;
+                continue;
+            }
             if let Some(bar) = pci_device.bar(slot) {
+                prev_was_64 = matches!(bar, pci::Bar::Mem64 { .. });
                 let pages = match bar {
                     pci::Bar::Mem32 {
                         address,

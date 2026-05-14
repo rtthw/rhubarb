@@ -308,10 +308,16 @@ impl Debug for Device {
             debug_struct.field("secondary_latency", &reg_6.secondary_latency_timer());
         }
 
+        let mut prev_was_64 = false;
         for slot in 0..6 {
+            if prev_was_64 {
+                prev_was_64 = false;
+                continue;
+            }
             let Some(bar) = self.bar(slot) else {
                 continue;
             };
+            prev_was_64 = matches!(bar, Bar::Mem64 { .. });
             debug_struct.field(&format!("bar_{slot}"), &bar);
         }
 
