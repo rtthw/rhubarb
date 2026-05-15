@@ -7,10 +7,12 @@ extern crate alloc;
 mod serial;
 
 use {
-    alloc::vec::Vec,
-    boot_info::{BootInfo, DisplayInfo, MemoryRegion, MemoryRegionKind},
+    alloc::{string::ToString, vec::Vec},
+    boot_info::{
+        BootInfo, DisplayInfo, MAX_OBJECT_NAME_LEN, MemoryRegion, MemoryRegionKind, RootObjectInfo,
+    },
     elf::{ElfFile, ProgramHeaderType},
-    log::{info, warn},
+    log::{debug, info, warn},
     memory_types::PAGE_SIZE,
     uefi::{
         CStr16, Status,
@@ -38,6 +40,8 @@ fn main() -> Status {
 
     let (kernel_start, kernel_end, kernel_entry_point) = load_kernel();
     info!("Kernel entry point @ {:#x}", kernel_entry_point);
+
+    let root_objects = load_root_objects();
 
     let display_info = get_display_info();
 
@@ -88,6 +92,7 @@ fn main() -> Status {
         kernel_start,
         kernel_end,
         memory_map: memory_regions.leak().into(),
+        root_object_map: root_objects.leak().into(),
         display_info,
     };
 
@@ -181,6 +186,52 @@ fn load_kernel() -> (
     );
 
     (start_addr, end_addr, elf.header.body.entry_point)
+}
+
+fn load_root_objects() -> Vec<RootObjectInfo> {
+    let fs = boot::get_handle_for_protocol::<SimpleFileSystem>().unwrap();
+    let mut root = boot::open_protocol_exclusive::<SimpleFileSystem>(fs)
+        .unwrap()
+        .open_volume()
+        .unwrap();
+
+    let mut objects = Vec::new();
+    while let Some(info) = root.read_entry_boxed().unwrap() {
+        let file_name = info.file_name().to_string();
+        if !file_name.ends_with(".o") {
+            continue;
+        }
+
+        let mut file = root
+            .open(info.file_name(), FileMode::Read, FileAttribute::empty())
+            .unwrap()
+            .into_regular_file()
+            .unwrap();
+
+        let size = info.file_size() as usize;
+        let page_count = size.div_ceil(PAGE_SIZE);
+        let ptr = boot::allocate_pages(AllocateType::AnyPages, MemoryType::LOADER_DATA, page_count)
+            .unwrap();
+        let mut buf =
+            unsafe { core::slice::from_raw_parts_mut(ptr.as_ptr(), page_count * PAGE_SIZE) };
+
+        let read_end = file.read(&mut buf).unwrap();
+        assert_eq!(read_end, size);
+        buf[read_end..].fill(0);
+
+        let mut name = [0_u8; MAX_OBJECT_NAME_LEN];
+        let actual_name_end = file_name.len() - 2;
+        assert!(actual_name_end <= MAX_OBJECT_NAME_LEN);
+        name[..actual_name_end].clone_from_slice(&file_name.as_bytes()[..actual_name_end]);
+
+        let addr = ptr.addr().into();
+
+        debug!("Root object: `{file_name}` ({size} bytes) @ {addr:x}");
+
+        objects.push(RootObjectInfo { name, addr, size });
+    }
+
+    objects
 }
 
 fn get_display_info() -> DisplayInfo {

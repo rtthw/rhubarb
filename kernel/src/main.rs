@@ -82,6 +82,10 @@ pub extern "sysv64" fn main(boot_info: &'static BootInfo) -> ! {
     acpi::init(boot_info);
     ata::init(boot_info);
 
+    for object in boot_info.root_object_map.iter() {
+        log::debug!("OBJECT: {object:x?}");
+    }
+
     info!("STARTUP SUCCESSFUL");
 
     // Run the example program.

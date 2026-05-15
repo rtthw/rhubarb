@@ -4,9 +4,14 @@
 
 #![no_std]
 
-use core::ops::{Deref, DerefMut};
+use core::{
+    fmt,
+    ops::{Deref, DerefMut},
+    str,
+};
 
 
+pub const MAX_OBJECT_NAME_LEN: usize = 32;
 
 /// Information passed from the boot loader to the kernel when the OS boots up.
 #[derive(Debug)]
@@ -16,6 +21,7 @@ pub struct BootInfo {
     pub kernel_start: usize,
     pub kernel_end: usize,
     pub memory_map: MemoryMap,
+    pub root_object_map: RootObjectMap,
     pub display_info: DisplayInfo,
 }
 
@@ -88,4 +94,64 @@ pub enum MemoryRegionKind {
     Free,
     Bootloader,
     Uefi(u32),
+}
+
+#[derive(Debug)]
+#[repr(C)]
+pub struct RootObjectMap {
+    ptr: *mut RootObjectInfo,
+    len: usize,
+}
+
+impl Deref for RootObjectMap {
+    type Target = [RootObjectInfo];
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { core::slice::from_raw_parts(self.ptr, self.len) }
+    }
+}
+
+impl DerefMut for RootObjectMap {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { core::slice::from_raw_parts_mut(self.ptr, self.len) }
+    }
+}
+
+impl From<&'static mut [RootObjectInfo]> for RootObjectMap {
+    fn from(regions: &'static mut [RootObjectInfo]) -> Self {
+        Self {
+            ptr: regions.as_mut_ptr(),
+            len: regions.len(),
+        }
+    }
+}
+
+impl From<RootObjectMap> for &'static mut [RootObjectInfo] {
+    fn from(map: RootObjectMap) -> &'static mut [RootObjectInfo] {
+        unsafe { core::slice::from_raw_parts_mut(map.ptr, map.len) }
+    }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+#[repr(C)]
+pub struct RootObjectInfo {
+    pub name: [u8; MAX_OBJECT_NAME_LEN],
+    pub addr: usize,
+    pub size: usize,
+}
+
+impl RootObjectInfo {
+    pub fn name_str(&self) -> &str {
+        core::str::from_utf8(&self.name).unwrap().trim_matches('\0')
+    }
+}
+
+impl fmt::Debug for RootObjectInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ObjectInfo")
+            .field("name", &self.name_str())
+            .field("addr", &self.addr)
+            .field("size", &self.size)
+            .finish()
+    }
 }
