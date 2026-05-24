@@ -11,6 +11,7 @@ use {
     core::fmt,
     fs::{DirectoryEntry, FileSystem},
     hashbrown::HashMap,
+    io::BlockReader,
     log::{debug, error},
 };
 
@@ -24,7 +25,7 @@ const BAD_CLUSTER_INDEX: u32 = 0xFFF7;
 pub fn init(boot_info: &BootInfo, drive: &mut Drive, lba_start: u32, lba_sector_count: u32) {
     let mut buf = [0; SECTOR_SIZE];
     drive
-        .read(lba_start, &mut buf)
+        .read_blocks(lba_start as usize, &mut buf)
         .map_err(|_| "failed to read VFAT boot sector")
         .unwrap();
 
@@ -69,8 +70,8 @@ fn read_file_bytes(
             let sector_end = sector_start + SECTOR_SIZE;
 
             drive
-                .read(
-                    lba_start + cluster_offset as u32 + sector_offset as u32,
+                .read_blocks(
+                    lba_start as usize + cluster_offset + sector_offset,
                     &mut cluster_bytes[sector_start..sector_end],
                 )
                 .map_err(|_| "failed to read cluster sector")?;
@@ -94,7 +95,7 @@ fn read_file_bytes(
 
             let mut sector = [0; SECTOR_SIZE];
             drive
-                .read(lba_start + fat_sector as u32, &mut sector)
+                .read_blocks(lba_start as usize + fat_sector, &mut sector)
                 .map_err(|_| "failed to read sector for FAT entry")?;
 
             u16::from_le_bytes([sector[entry_offset], sector[entry_offset + 1]]) as usize
@@ -279,8 +280,8 @@ impl VfatFileSystem {
         'read_sectors: for sector_offset in 0..boot_sector.root_sector_count() {
             let mut sector_bytes = [0; SECTOR_SIZE];
             drive
-                .read(
-                    lba_start + cluster_offset as u32 + sector_offset as u32,
+                .read_blocks(
+                    lba_start as usize + cluster_offset + sector_offset,
                     &mut sector_bytes,
                 )
                 .map_err(|_| "failed to read root directory sector")?;

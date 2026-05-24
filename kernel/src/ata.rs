@@ -6,6 +6,7 @@ use {
     bit_utils::bit_field,
     boot_info::BootInfo,
     core::{fmt, time::Duration},
+    io::BlockReader,
     log::{debug, info, trace, warn},
     spin_mutex::Mutex,
     x86_64::instructions::port::Port,
@@ -325,20 +326,38 @@ impl Drive {
         }
     }
 
-    pub fn read(&mut self, block: u32, buf: &mut [u8]) -> Result<(), &'static str> {
-        if block == self.sector_count {
-            return Err("attempted to read past end of drive");
-        }
-
-        let mut buses = BUSES.lock();
-        let bus = &mut buses[self.bus as usize];
-        bus.read(self.id, block, buf)?;
-
-        Ok(())
-    }
-
     pub fn len(&self) -> usize {
         self.sector_count as usize * SECTOR_SIZE
+    }
+}
+
+impl io::BlockSize for Drive {
+    #[inline(always)]
+    fn block_size(&self) -> usize {
+        SECTOR_SIZE
+    }
+}
+
+impl io::BlockReader for Drive {
+    fn read_blocks(&mut self, offset: usize, buffer: &mut [u8]) -> Result<usize, io::ReadError> {
+        let length = buffer.len();
+        if length % SECTOR_SIZE != 0 {
+            return Err(io::ReadError::InvalidBufferLength { length });
+        }
+        let block_count = length / SECTOR_SIZE;
+        let mut buses = BUSES.lock();
+        let bus = &mut buses[self.bus as usize];
+        for offset_addend in 0..block_count {
+            let block_start = offset_addend * SECTOR_SIZE;
+            let block_end = block_start + SECTOR_SIZE;
+            bus.read(
+                self.id,
+                (offset + offset_addend) as u32,
+                &mut buffer[block_start..block_end],
+            )?;
+        }
+
+        Ok(length)
     }
 }
 
@@ -391,7 +410,7 @@ pub enum Partition {
 fn get_drive_partitions(drive: &mut Drive) -> Result<Vec<Partition>, &'static str> {
     let mut buf = [0; SECTOR_SIZE];
     drive
-        .read(0, &mut buf)
+        .read_blocks(0, &mut buf)
         .map_err(|_| "failed to read MBR sector")?;
 
     if &buf[510..512] != &[0x55, 0xAA] {

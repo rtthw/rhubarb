@@ -204,6 +204,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "io"
+version = "0.1.0"
+
+[[package]]
 name = "itertools"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -225,6 +229,7 @@ dependencies = [
  "fs",
  "hashbrown",
  "input",
+ "io",
  "linked_list_allocator",
  "log 0.1.0",
  "math",

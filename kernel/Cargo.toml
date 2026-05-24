@@ -13,6 +13,7 @@ framebuffer = { path = "../crates/framebuffer" }
 fs = { path = "../crates/fs" }
 hashbrown = "0.16.1"
 input = { path = "../crates/input" }
+io = { path = "../crates/io" }
 linked_list_allocator = "0.9.0"
 log = { path = "../crates/log" }
 math = { path = "../crates/math" }
