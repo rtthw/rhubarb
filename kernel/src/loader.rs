@@ -3,10 +3,7 @@
 //! Types and functions used to dynamically load (and link) programs.
 
 use {
-    crate::{
-        FileSystem,
-        memory::{AddressSpace, KernelMapping},
-    },
+    crate::memory::{AddressSpace, KernelMapping},
     alloc::{
         boxed::Box,
         collections::{btree_map::BTreeMap, btree_set::BTreeSet},
@@ -24,6 +21,7 @@ use {
         ElfFile, ObjectFileType, SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData,
         SectionHeaderType, SymbolBinding, SymbolType,
     },
+    fs::FileSystem,
     hashbrown::HashMap,
     log::{debug, error, info, trace},
     memory_types::{Page, PageRange, PageTableFlags, VirtualAddress},

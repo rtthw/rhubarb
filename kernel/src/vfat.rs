@@ -1,7 +1,7 @@
 //! # Virtual File Allocation Table (VFAT)
 
 use {
-    crate::{DirectoryEntry, FileSystem, ata::Drive, loader},
+    crate::{ata::Drive, loader},
     alloc::{
         collections::vec_deque::VecDeque,
         string::{String, ToString as _},
@@ -9,6 +9,7 @@ use {
     },
     boot_info::BootInfo,
     core::fmt,
+    fs::{DirectoryEntry, FileSystem},
     hashbrown::HashMap,
     log::{debug, error},
 };

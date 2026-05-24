@@ -1,0 +1,9 @@
+[package]
+name = "fs"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+path = "src/fs.rs"
+
+[dependencies]

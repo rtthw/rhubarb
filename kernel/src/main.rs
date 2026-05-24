@@ -20,13 +20,7 @@ mod serial;
 mod tsc;
 mod vfat;
 
-use {
-    alloc::{string::String, vec::Vec},
-    boot_info::BootInfo,
-    core::arch::asm,
-    log::info,
-    memory_types::PAGE_SIZE,
-};
+use {boot_info::BootInfo, core::arch::asm, log::info, memory_types::PAGE_SIZE};
 
 
 // Linker offset symbols (see `../kernel_x86_64.ld`).
@@ -130,17 +124,4 @@ impl KernelStack {
     const fn as_ptr(&self) -> *const u8 {
         self.0.as_ptr()
     }
-}
-
-
-
-pub trait FileSystem {
-    fn list(&self, dir_path: &str) -> Result<Vec<String>, &'static str>;
-    fn read(&mut self, path: &str) -> Result<Vec<u8>, &'static str>;
-}
-
-pub struct DirectoryEntry {
-    pub index: usize,
-    pub name: String,
-    pub size: usize,
 }
