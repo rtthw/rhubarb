@@ -56,17 +56,17 @@ pub extern "sysv64" fn main(boot_info: &'static BootInfo) -> ! {
 
     serial::init();
 
-    info!(
-        "KERNEL STARTUP @ {startup_time}\n\
-        \trange: {:#x}..{:#x}\n\
-        \ttext: {:#x}..{:#x}\n\
-        \trodata: {:#x}..{:#x}",
-        (&raw const __kernel_start) as usize,
-        (&raw const __kernel_end) as usize,
-        (&raw const __text_start) as usize,
-        (&raw const __text_end) as usize,
-        (&raw const __rodata_start) as usize,
-        (&raw const __rodata_end) as usize,
+    log::record!(
+        "STARTUP",
+        time = startup_time,
+        range "{:x?}"
+            = ((&raw const __kernel_start) as usize)..((&raw const __kernel_end) as usize),
+        text "{:x?}"
+            = ((&raw const __text_start) as usize)..((&raw const __text_end) as usize),
+        rodata "{:x?}"
+            = ((&raw const __rodata_start) as usize)..((&raw const __rodata_end) as usize),
+        stack "{:x?}"
+            = (KERNEL_STACK.as_ptr() as usize)..(KERNEL_STACK.as_ptr() as usize + KERNEL_STACK_SIZE),
     );
 
     gdt::init();

@@ -169,6 +169,26 @@ macro_rules! log {
     });
 }
 
+#[macro_export]
+macro_rules! record {
+    // record!("message header", thing "{:x}" = 45, other = "thing")
+    ($message:expr $(, $($arg:ident $($fmt:literal)? = $eval:expr),+ $(,)?)?) => {{
+        $crate::log!(
+            $crate::LogLevel::Info,
+            $crate::__private::concat!(
+                $message,
+                $($crate::__private::concat!($(
+                    "\n\t\x1b[2m",
+                    $crate::__private::stringify!($arg),
+                    "\x1b[0m\t",
+                    $crate::__expand_if_empty!($($fmt)?; "{}"),
+                )+))?,
+            ),
+            $($($eval),+)?
+        )
+    }};
+}
+
 
 
 struct DummyLogger;
@@ -185,12 +205,13 @@ impl Log for DummyLogger {
     }
 }
 
+#[doc(hidden)]
 pub mod __private {
     use core::{fmt::Arguments, panic::Location};
 
-    pub use core::{format_args, module_path};
+    pub use core::{concat, format_args, module_path, stringify};
 
-
+    #[doc(hidden)]
     pub fn log(
         level: super::LogLevel,
         target: &str,
@@ -201,8 +222,30 @@ pub mod __private {
         super::get_logger().log(level, target, module_path, location, args);
     }
 
+    #[doc(hidden)]
     #[track_caller]
     pub const fn location() -> &'static Location<'static> {
         Location::caller()
+    }
+
+    /// Internal utility macro that evaluates to the provided expansion if the
+    /// input before the semicolon is empty.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use log::__private::__expand_if_empty;
+    /// assert_eq!(__expand_if_empty!(0;1), 0);
+    /// assert_eq!(__expand_if_empty!( ;1), 1);
+    /// ```
+    #[macro_export]
+    #[doc(hidden)]
+    macro_rules! __expand_if_empty {
+        ($something:expr ; $expansion:expr) => {
+            $something
+        };
+        (; $expansion:expr) => {
+            $expansion
+        };
     }
 }
