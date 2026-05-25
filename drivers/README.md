@@ -8,6 +8,7 @@ Modules that manage specific devices.
 
 | Driver Name | Status |
 | --- | --- |
+| [Advanced Technology Attachment (ATA))](./ata) | ✔️ Full Support |
 | [PCI (Peripheral Component Interconnect)](./pci) | ▢ Partial Support |
 | [Programmable Interval Timer (PIT)](./pit) | ✔️ Full Support |
 | [Real-Time Clock (RTC)](./rtc) | ▢ Partial Support |

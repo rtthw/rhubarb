@@ -1,0 +1,15 @@
+[package]
+name = "ata"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+path = "src/ata.rs"
+
+[dependencies]
+bit-utils = { path = "../../crates/bit-utils" }
+io = { path = "../../crates/io" }
+log = { path = "../../crates/log" }
+time = { path = "../../crates/time" }
+spin-mutex = { path = "../../crates/spin-mutex" }
+x86-port = { path = "../x86-port" }

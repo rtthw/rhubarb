@@ -1,7 +1,7 @@
 //! # Virtual File Allocation Table (VFAT)
 
 use {
-    crate::{ata::Drive, loader},
+    crate::loader,
     alloc::{
         collections::vec_deque::VecDeque,
         string::{String, ToString as _},
@@ -22,7 +22,7 @@ const BAD_CLUSTER_INDEX: u32 = 0xFFF7;
 
 
 
-pub fn init(boot_info: &BootInfo, drive: &mut Drive, lba_start: u32, lba_sector_count: u32) {
+pub fn init(boot_info: &BootInfo, drive: &mut ata::Drive, lba_start: u32, lba_sector_count: u32) {
     let mut buf = [0; SECTOR_SIZE];
     drive
         .read_blocks(lba_start as usize, &mut buf)
@@ -44,7 +44,7 @@ pub fn init(boot_info: &BootInfo, drive: &mut Drive, lba_start: u32, lba_sector_
 
 // https://wiki.osdev.org/FAT#FAT_32_and_exFAT
 fn read_file_bytes(
-    drive: &mut Drive,
+    drive: &mut ata::Drive,
     lba_start: u32,
     boot_sector: &VfatBootSector,
     first_cluster: usize,
@@ -259,7 +259,7 @@ impl VfatBootSector {
 }
 
 pub struct VfatFileSystem {
-    drive: Drive,
+    drive: ata::Drive,
     lba_start: u32,
     boot_sector: VfatBootSector,
     cache: HashMap<String, DirectoryEntry>,
@@ -267,7 +267,7 @@ pub struct VfatFileSystem {
 
 impl VfatFileSystem {
     fn new(
-        mut drive: Drive,
+        mut drive: ata::Drive,
         boot_sector: VfatBootSector,
         lba_start: u32,
     ) -> Result<Self, &'static str> {
