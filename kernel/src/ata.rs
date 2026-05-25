@@ -9,7 +9,6 @@ use {
     io::BlockReader,
     log::{debug, info, trace, warn},
     spin_mutex::Mutex,
-    x86_64::instructions::port::Port,
 };
 
 
@@ -86,15 +85,8 @@ pub struct Bus {
     selected_drive: Option<u8>,
 
     // https://wiki.osdev.org/ATA_PIO#Registers
-    data_register: Port<u16>,
-    sector_count_register: Port<u8>,
-    lba_low_register: Port<u8>,
-    lba_mid_register: Port<u8>,
-    lba_high_register: Port<u8>,
-    drive_register: Port<u8>,
-    status_register: Port<u8>,
-    command_register: Port<u8>,
-    alt_status_register: Port<u8>,
+    io_port_base: u16,
+    control_port_base: u16,
 }
 
 impl Bus {
@@ -102,26 +94,19 @@ impl Bus {
         Self {
             id,
             selected_drive: None,
-
-            // https://wiki.osdev.org/ATA_PIO#Registers
-            data_register: Port::new(io_port_base + DATA_REGISTER_OFFSET),
-            sector_count_register: Port::new(io_port_base + SECTOR_COUNT_REGISTER_OFFSET),
-            lba_low_register: Port::new(io_port_base + LBA_LOW_REGISTER_OFFSET),
-            lba_mid_register: Port::new(io_port_base + LBA_MID_REGISTER_OFFSET),
-            lba_high_register: Port::new(io_port_base + LBA_HIGH_REGISTER_OFFSET),
-            drive_register: Port::new(io_port_base + DRIVE_REGISTER_OFFSET),
-            status_register: Port::new(io_port_base + STATUS_REGISTER_OFFSET),
-            command_register: Port::new(io_port_base + COMMAND_REGISTER_OFFSET),
-            alt_status_register: Port::new(control_port_base + ALT_STATUS_REGISTER_OFFSET),
+            io_port_base,
+            control_port_base,
         }
     }
 
     fn status(&mut self) -> Status {
-        Status(unsafe { self.alt_status_register.read() })
+        // The ALT_STATUS register is just a copy of the STATUS register that doesn't
+        // affect interrupts.
+        Status(unsafe { x86_port::read_u8(self.control_port_base + ALT_STATUS_REGISTER_OFFSET) })
     }
 
     fn read_data(&mut self) -> u16 {
-        unsafe { self.data_register.read() }
+        unsafe { x86_port::read_u16(self.io_port_base + DATA_REGISTER_OFFSET) }
     }
 
     fn read(&mut self, drive: u8, block: u32, buf: &mut [u8]) -> Result<(), &'static str> {
@@ -169,7 +154,12 @@ impl Bus {
             self.selected_drive = Some(drive);
         }
 
-        unsafe { self.drive_register.write(0b10100000 | (drive << 4)) }
+        unsafe {
+            x86_port::write_u8(
+                self.io_port_base + DRIVE_REGISTER_OFFSET,
+                0b10100000 | (drive << 4),
+            );
+        }
 
         let start = time::now();
         while time::now().duration_since(start) < Duration::from_nanos(400) {
@@ -185,15 +175,19 @@ impl Bus {
     fn write_command(&mut self, drive: u8, block: u32, command: u16) -> Result<(), &'static str> {
         let block_bytes = block.to_le_bytes();
         unsafe {
-            self.sector_count_register.write(1);
-            self.lba_low_register.write(block_bytes[0]);
-            self.lba_mid_register.write(block_bytes[1]);
-            self.lba_high_register.write(block_bytes[2]);
-            self.drive_register
-                .write(block_bytes[3] | (0b11100000 | (drive << 4)));
+            x86_port::write_u8(self.io_port_base + SECTOR_COUNT_REGISTER_OFFSET, 1);
+            x86_port::write_u8(self.io_port_base + LBA_LOW_REGISTER_OFFSET, block_bytes[0]);
+            x86_port::write_u8(self.io_port_base + LBA_MID_REGISTER_OFFSET, block_bytes[1]);
+            x86_port::write_u8(self.io_port_base + LBA_HIGH_REGISTER_OFFSET, block_bytes[2]);
+            x86_port::write_u8(
+                self.io_port_base + DRIVE_REGISTER_OFFSET,
+                block_bytes[3] | (0b11100000 | (drive << 4)),
+            );
         }
 
-        unsafe { self.command_register.write(command as u8) }
+        unsafe {
+            x86_port::write_u8(self.io_port_base + COMMAND_REGISTER_OFFSET, command as u8);
+        }
 
         let start = time::now();
         while time::now().duration_since(start) < Duration::from_nanos(400) {
@@ -202,7 +196,7 @@ impl Bus {
 
         _ = self.status();
         unsafe {
-            _ = self.status_register.read();
+            _ = x86_port::read_u8(self.io_port_base + STATUS_REGISTER_OFFSET);
         }
 
         // https://wiki.osdev.org/ATA_PIO#IDENTIFY_command
@@ -235,7 +229,12 @@ impl Bus {
         }
 
         // https://wiki.osdev.org/ATA_PIO#Detecting_device_types
-        match unsafe { (self.lba_mid_register.read(), self.lba_high_register.read()) } {
+        match unsafe {
+            (
+                x86_port::read_u8(self.io_port_base + LBA_MID_REGISTER_OFFSET),
+                x86_port::read_u8(self.io_port_base + LBA_HIGH_REGISTER_OFFSET),
+            )
+        } {
             (0x00, 0x00) => Ok(IdentifyResponse::Pata([(); 256].map(|_| self.read_data()))),
             (0x14, 0xEB) => Ok(IdentifyResponse::PataPi),
             (0x3C, 0xC3) => Ok(IdentifyResponse::Sata),
