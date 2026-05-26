@@ -9,7 +9,7 @@ use {
     },
     hashbrown::HashMap,
     linked_list_allocator::LockedHeap,
-    log::{debug, error, info, trace, warn},
+    log::{debug, info, trace, warn},
     memory_types::{
         Frame, FrameAllocator as DynFrameAllocator, GIBIBYTE, Level4PageTable, MEBIBYTE, PAGE_SIZE,
         Page, PageRange, PageTable, PageTableFlags, PhysicalAddress, VirtualAddress,
@@ -77,25 +77,15 @@ pub fn init(boot_info: &BootInfo) {
         let total_frames = frame_allocator.total_frames;
         let free_memory = (free_frames * PAGE_SIZE) / MEBIBYTE;
         let total_memory = (total_frames * PAGE_SIZE) / MEBIBYTE;
+
         info!(
             "Physical memory allocator initialized\n\
             \tFree frames: {free_frames} / {total_frames}\n\
             \tFree memory: {free_memory} MiB / {total_memory} MiB",
         );
 
-        match frame_allocator.allocate() {
-            Ok(frame) => {
-                debug!("    Allocated frame: {frame}");
-                if let Err(error) = frame_allocator.deallocate(frame) {
-                    error!("    Failed to deallocate frame: {error:?}");
-                } else {
-                    debug!("    Deallocated frame successfully");
-                }
-            }
-            Err(error) => {
-                error!("    Failed to allocate frame: {error:?}");
-            }
-        }
+        // Test the frame allocator.
+        initial_frame_allocation_test(&mut frame_allocator);
 
         free_frames
     };
@@ -144,7 +134,7 @@ pub fn init(boot_info: &BootInfo) {
     }
 
     // Make sure the heap allocator actually works.
-    initial_heap_test();
+    initial_heap_allocation_test();
 
     info!("Heap initialized successfully");
 
@@ -209,7 +199,7 @@ pub fn init(boot_info: &BootInfo) {
     }
 }
 
-fn initial_heap_test() {
+fn initial_heap_allocation_test() {
     {
         let object_1: Vec<u8> = vec![1, 2, 3];
         let object_1_addr = object_1.as_ptr().addr();
@@ -229,6 +219,22 @@ fn initial_heap_test() {
     // The heap should start at `HEAP_START` and grow upwards, so this object should
     // have a higher virtual address.
     assert!(object_3_addr > KERNEL_HEAP_BASE);
+}
+
+fn initial_frame_allocation_test(frame_allocator: &mut FrameAllocator) {
+    match frame_allocator.allocate() {
+        Ok(frame) => {
+            debug!("Allocated test frame: {frame}");
+            if let Err(error) = frame_allocator.deallocate(frame) {
+                panic!("Failed to deallocate test frame: {error:?}");
+            } else {
+                debug!("Deallocated test frame successfully");
+            }
+        }
+        Err(error) => {
+            panic!("Failed to allocate test frame: {error:?}");
+        }
+    }
 }
 
 
