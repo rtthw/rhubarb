@@ -69,7 +69,7 @@ impl Framebuffer {
         }
     }
 
-    pub fn with_new_addr(&self, addr: usize) -> Self {
+    pub const fn with_new_addr(&self, addr: usize) -> Self {
         Self {
             ptr: addr as *mut u32,
             width: self.width,
@@ -78,7 +78,15 @@ impl Framebuffer {
         }
     }
 
-    pub fn buffer(&self) -> &[u32] {
+    pub const fn to_color_buffer(self) -> ColorBuffer {
+        ColorBuffer {
+            ptr: self.ptr as *mut Color,
+            width: self.width,
+            height: self.height,
+        }
+    }
+
+    pub const fn buffer(&self) -> &[u32] {
         unsafe { core::slice::from_raw_parts(self.ptr, self.width * self.height) }
     }
 
@@ -94,11 +102,11 @@ impl Framebuffer {
         Size::new(self.width as f32, self.height as f32)
     }
 
-    pub fn size_in_bytes(&self) -> usize {
+    pub const fn size_in_bytes(&self) -> usize {
         self.width * self.height * 4
     }
 
-    pub fn point_index(&self, point: Point) -> Option<usize> {
+    pub const fn point_index(&self, point: Point) -> Option<usize> {
         if self.area().contains(point) {
             Some((self.width * point.y as usize) + point.x as usize)
         } else {
@@ -108,10 +116,7 @@ impl Framebuffer {
 
     pub fn clear_screen(&mut self, color: Color) {
         let color = color.to_u32(self.format);
-
-        unsafe {
-            core::slice::from_raw_parts_mut(self.ptr, self.width * self.height).fill(color);
-        }
+        self.buffer_mut().fill(color);
     }
 
     pub fn draw_pixel(&mut self, point: Point, color: Color) {
@@ -210,10 +215,130 @@ impl Framebuffer {
             }
         }
     }
+
+    pub fn blend(&mut self, source: &[Color], start_index: usize) {
+        let format = self.format;
+        let buffer = &mut self.buffer_mut()[start_index..(start_index + source.len())];
+        for pixel_index in 0..source.len() {
+            buffer[pixel_index] = source[pixel_index].blend(buffer[pixel_index], format);
+        }
+    }
+}
+
+pub struct ColorBuffer {
+    ptr: *mut Color,
+    width: usize,
+    height: usize,
+}
+
+impl ColorBuffer {
+    pub const fn buffer(&self) -> &[Color] {
+        unsafe { core::slice::from_raw_parts(self.ptr, self.width * self.height) }
+    }
+
+    pub const fn buffer_mut(&mut self) -> &mut [Color] {
+        unsafe { core::slice::from_raw_parts_mut(self.ptr, self.width * self.height) }
+    }
+
+    pub const fn area(&self) -> Area {
+        Area::from_size(self.size())
+    }
+
+    pub const fn size(&self) -> Size {
+        Size::new(self.width as f32, self.height as f32)
+    }
+
+    pub fn size_in_bytes(&self) -> usize {
+        self.width * self.height * 4
+    }
+
+    pub fn point_index(&self, point: Point) -> Option<usize> {
+        if self.area().contains(point) {
+            Some((self.width * point.y as usize) + point.x as usize)
+        } else {
+            None
+        }
+    }
+
+    pub fn clear_screen(&mut self, color: Color) {
+        self.buffer_mut().fill(color);
+    }
+
+    pub fn draw_pixel(&mut self, point: Point, color: Color) {
+        if !self.area().contains(point) {
+            return;
+        }
+
+        unsafe {
+            let ptr = self
+                .ptr
+                .add(point.y as usize * self.width + point.x as usize);
+            ptr.write(color);
+        }
+    }
+
+    pub fn draw_ascii_char(
+        &mut self,
+        ch: char,
+        fg_color: Color,
+        bg_color: Color,
+        pos: Point,
+        col: usize,
+        row: usize,
+    ) {
+        let ch = if ch.is_ascii() { ch } else { '?' };
+
+        let start_x = pos.x + (col * CHAR_WIDTH) as f32;
+        let start_y = pos.y + (row * CHAR_HEIGHT) as f32;
+
+        let area = area(
+            point(start_x, start_y),
+            size(CHAR_WIDTH as f32, CHAR_HEIGHT as f32),
+        );
+
+        if !self.area().intersects(&area) {
+            return;
+        }
+
+        let offset_x = if start_x < 0.0 { -start_x } else { 0.0 };
+        let offset_y = if start_y < 0.0 { -start_y } else { 0.0 };
+        let mut x_add = offset_x;
+        let mut y_add = offset_y;
+        loop {
+            let pos = point(start_x + x_add, start_y + y_add);
+
+            if self.area().contains(pos) {
+                let color = if x_add >= 1.0 {
+                    // Leave a 1 pixel gap between characters.
+                    let index = (x_add - 1.0) as usize;
+                    let font_char = font::BASIC_FONT[ch as usize][y_add as usize];
+                    // The most significant bit determines whether the pixel's color belongs to the
+                    // foreground or background.
+                    if font_char & (0x80 >> index) != 0 {
+                        fg_color
+                    } else {
+                        bg_color
+                    }
+                } else {
+                    bg_color
+                };
+                self.draw_pixel(pos, color);
+            }
+
+            x_add += 1.0;
+            if x_add >= CHAR_WIDTH as f32 || start_x + x_add >= self.width as f32 {
+                y_add += 1.0;
+                if y_add >= CHAR_HEIGHT as f32 || start_y + y_add >= self.height as f32 {
+                    return;
+                }
+                x_add = offset_x;
+            }
+        }
+    }
 }
 
 pub fn composite<'a>(
-    sources: impl IntoIterator<Item = (&'a mut Framebuffer, Point)>,
+    sources: impl IntoIterator<Item = (&'a mut ColorBuffer, Point)>,
     target: &mut Framebuffer,
 ) {
     for (source, point_in_target) in sources.into_iter() {
@@ -221,7 +346,7 @@ pub fn composite<'a>(
     }
 }
 
-fn composite_buffer(source: &Framebuffer, target: &mut Framebuffer, target_point: Point) {
+fn composite_buffer(source: &ColorBuffer, target: &mut Framebuffer, target_point: Point) {
     let target_size = target.size();
     let source_size = source.size();
 
@@ -267,9 +392,10 @@ fn composite_buffer(source: &Framebuffer, target: &mut Framebuffer, target_point
             break;
         };
 
-        let source_slice = &source.buffer()[source_start_index..source_end_index];
-        target.buffer_mut()[target_start_index..(target_start_index + source_slice.len())]
-            .copy_from_slice(source_slice);
+        target.blend(
+            &source.buffer()[source_start_index..source_end_index],
+            target_start_index,
+        );
     }
 }
 
@@ -310,5 +436,12 @@ impl Color {
             PixelFormat::Bgr => (self.r as u32) << 16 | (self.g as u32) << 8 | (self.b as u32) << 0,
             PixelFormat::Rgb => (self.r as u32) << 0 | (self.g as u32) << 8 | (self.b as u32) << 16,
         }
+    }
+
+    pub const fn blend(self, pixel: u32, format: PixelFormat) -> u32 {
+        if self.a == 0 {
+            return pixel;
+        }
+        self.to_u32(format)
     }
 }

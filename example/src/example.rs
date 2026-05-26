@@ -10,10 +10,12 @@ use {
     math::Point,
 };
 
+const BG_COLOR: Color = Color::rgb(0x2B, 0x2B, 0x33);
+
 const POINTER_HEIGHT: usize = 16;
 const POINTER_WIDTH: usize = 10;
 static POINTER_IMAGE: [[Color; POINTER_HEIGHT]; POINTER_WIDTH] = {
-    const O: Color = Color::rgb(0x2B, 0x2B, 0x33); // Background.
+    const O: Color = Color::NONE; // Background.
     const F: Color = Color::BLACK; // Cursor face.
     const B: Color = Color::WHITE; // Cursor border.
 
@@ -48,12 +50,13 @@ pub extern "C" fn main() -> ! {
     }
 
     let mut framebuffer = framebuffer::Framebuffer::global().unwrap();
-    framebuffer.clear_screen(Color::rgb(0x2B, 0x2B, 0x33));
+    framebuffer.clear_screen(BG_COLOR);
 
     let mouse_fb_size = POINTER_WIDTH * POINTER_HEIGHT * 4;
     let mouse_fb_page_count = mouse_fb_size.div_ceil(4096);
     let mouse_fb_addr = heap::BASE_ADDR + 4096;
-    let mut mouse_fb = framebuffer::Framebuffer::new(mouse_fb_addr, POINTER_WIDTH, POINTER_HEIGHT);
+    let mut mouse_fb = framebuffer::Framebuffer::new(mouse_fb_addr, POINTER_WIDTH, POINTER_HEIGHT)
+        .to_color_buffer();
     for y in 0..POINTER_HEIGHT {
         for x in 0..POINTER_WIDTH {
             let color = POINTER_IMAGE[x as usize][y as usize];
@@ -61,19 +64,34 @@ pub extern "C" fn main() -> ! {
         }
     }
 
-    // let bottom_fb_page_count = framebuffer.size_in_bytes().div_ceil(4096);
-    let bottom_fb_addr = mouse_fb_addr + (mouse_fb_page_count * 4096);
-    let mut bottom_fb = framebuffer.with_new_addr(bottom_fb_addr as usize);
+    let top_fb_page_count = framebuffer.size_in_bytes().div_ceil(4096);
+    let top_fb_addr = mouse_fb_addr + (mouse_fb_page_count * 4096);
+    let bottom_fb_addr = top_fb_addr + (top_fb_page_count * 4096);
+
+    let mut top_fb = framebuffer
+        .with_new_addr(top_fb_addr as usize)
+        .to_color_buffer();
+    let mut bottom_fb = framebuffer
+        .with_new_addr(bottom_fb_addr as usize)
+        .to_color_buffer();
 
     // HACK: We draw the bottom right pixel before doing anything with the
     //       framebuffer to trigger a heap extension large enough to fit the full
     //       memory range. Without this, the heap gets extended page-by-page (which
     //       is expensive).
+    top_fb.draw_pixel(
+        Point::ORIGIN + top_fb.area().size() - Point::ONE_ONE,
+        Color::NONE,
+    );
+    top_fb.clear_screen(Color::NONE);
     bottom_fb.draw_pixel(
         Point::ORIGIN + bottom_fb.area().size() - Point::ONE_ONE,
-        Color::rgb(0x2B, 0x2B, 0x33),
+        Color::NONE,
     );
-    bottom_fb.clear_screen(Color::rgb(0x2B, 0x2B, 0x33));
+    bottom_fb.clear_screen(BG_COLOR);
+
+    // bottom_fb.draw_ascii_char('B', Color::WHITE, BG_COLOR, Point::ONE_ONE, 0, 0);
+    // top_fb.draw_ascii_char('T', Color::RED, Color::NONE, Point::ONE_ONE, 0, 0);
 
     let display_width = framebuffer::FRAMEBUFFER_WIDTH.load(Ordering::Relaxed);
     let display_height = framebuffer::FRAMEBUFFER_HEIGHT.load(Ordering::Relaxed);
@@ -111,6 +129,7 @@ pub extern "C" fn main() -> ! {
                 framebuffer::composite(
                     [
                         (&mut bottom_fb, Point::ORIGIN),
+                        (&mut top_fb, Point::ORIGIN),
                         (&mut mouse_fb, input_state.mouse_pos),
                     ],
                     &mut framebuffer,
