@@ -7,10 +7,12 @@ use {
     framebuffer::Color,
     heap::string::ToString as _,
     input::{GLOBAL_INPUT_QUEUE, InputEvent},
-    math::Point,
+    math::{Area, Point, Size},
 };
 
-const BG_COLOR: Color = Color::rgb(0x2B, 0x2B, 0x33);
+const BG_COLOR: Color = Color::rgb(0x1E, 0x1E, 0x22);
+const FG_COLOR: Color = Color::rgb(0xA7, 0xA7, 0xAD);
+const PANEL_COLOR: Color = Color::rgb(0x2B, 0x2B, 0x33);
 
 const POINTER_HEIGHT: usize = 16;
 const POINTER_WIDTH: usize = 10;
@@ -90,13 +92,38 @@ pub extern "C" fn main() -> ! {
     );
     bottom_fb.clear_screen(BG_COLOR);
 
-    // bottom_fb.draw_ascii_char('B', Color::WHITE, BG_COLOR, Point::ONE_ONE, 0, 0);
-    // top_fb.draw_ascii_char('T', Color::RED, Color::NONE, Point::ONE_ONE, 0, 0);
+    let display_width = framebuffer::FRAMEBUFFER_WIDTH.load(Ordering::Relaxed) as f32;
+    let display_height = framebuffer::FRAMEBUFFER_HEIGHT.load(Ordering::Relaxed) as f32;
 
-    let display_width = framebuffer::FRAMEBUFFER_WIDTH.load(Ordering::Relaxed);
-    let display_height = framebuffer::FRAMEBUFFER_HEIGHT.load(Ordering::Relaxed);
+    let view_width = display_width / 1.31;
+    let view_height = display_height / 1.07;
+    let view_x_offset = display_width - view_width;
+    let view_y_offset = (display_height - view_height) / 2.0;
+
+    bottom_fb.fill_area(
+        Area::new(
+            Point::new(view_x_offset, view_y_offset),
+            Size::new(view_width, view_height),
+        ),
+        PANEL_COLOR,
+    );
+
+    let bar_height = view_y_offset;
+    let bar_text_y_offset = (bar_height - framebuffer::font::CHAR_HEIGHT as f32) / 2.0;
+
+    for (char_column, ch) in "Rhubarb v0.0.0".char_indices() {
+        top_fb.draw_ascii_char(
+            ch,
+            FG_COLOR,
+            Color::NONE,
+            Point::new(5.0, bar_text_y_offset),
+            char_column,
+            0,
+        );
+    }
+
     let mut input_state = InputState {
-        mouse_pos: Point::new(display_width as f32 / 2.0, display_height as f32 / 2.0),
+        mouse_pos: Point::new(display_width / 2.0, display_height / 2.0),
     };
 
     'main_loop: loop {
@@ -110,14 +137,12 @@ pub extern "C" fn main() -> ! {
                 }
                 InputEvent::MouseMove { delta_x, delta_y } => {
                     input_state.mouse_pos = Point::new(
-                        0_f32.max(
-                            (display_width as f32 - 1.0)
-                                .min(input_state.mouse_pos.x + delta_x as f32),
-                        ),
-                        0_f32.max(
-                            (display_height as f32 - 1.0)
-                                .min(input_state.mouse_pos.y + delta_y as f32),
-                        ),
+                        (display_width - 1.0)
+                            .min(input_state.mouse_pos.x + delta_x as f32)
+                            .max(0.0),
+                        (display_height - 1.0)
+                            .min(input_state.mouse_pos.y + delta_y as f32)
+                            .max(0.0),
                     );
 
                     true
