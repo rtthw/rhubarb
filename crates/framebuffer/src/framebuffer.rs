@@ -134,25 +134,29 @@ impl Framebuffer {
         }
     }
 
-    pub fn fill_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: Color) {
+    pub fn fill_area(&mut self, area: Area, color: Color) {
         let color = color.to_u32(self.format);
 
-        let x = x.clamp(0, self.width as _) as usize;
-        let y = y.clamp(0, self.height as _) as usize;
-        let w = w.clamp(0, self.width.saturating_sub(x) as _) as usize;
-        let h = h.clamp(0, self.height.saturating_sub(y) as _) as usize;
+        let x = area.x().clamp(0.0, self.width as _) as usize;
+        let y = area.y().clamp(0.0, self.height as _) as usize;
+        let width = area
+            .width()
+            .clamp(0.0, self.width.saturating_sub(area.x() as _) as _) as _;
+        let height = area
+            .height()
+            .clamp(0.0, self.height.saturating_sub(area.y() as _) as _) as _;
 
-        if w == 0 || h == 0 {
+        if width == 0 || height == 0 {
             return;
         }
 
         unsafe {
             let mut ptr = self.ptr.add(y * self.width + x);
-            core::slice::from_raw_parts_mut(ptr, w).fill(color);
-            for _ in 1..h {
+            core::slice::from_raw_parts_mut(ptr, width).fill(color);
+            for _ in 1..height {
                 let src = ptr;
                 ptr = ptr.add(self.width);
-                src.copy_to_nonoverlapping(ptr, w);
+                src.copy_to_nonoverlapping(ptr, width);
             }
         }
     }
@@ -274,6 +278,31 @@ impl ColorBuffer {
                 .ptr
                 .add(point.y as usize * self.width + point.x as usize);
             ptr.write(color);
+        }
+    }
+
+    pub fn fill_area(&mut self, area: Area, color: Color) {
+        let x = area.x().clamp(0.0, self.width as _) as usize;
+        let y = area.y().clamp(0.0, self.height as _) as usize;
+        let width = area
+            .width()
+            .clamp(0.0, self.width.saturating_sub(area.x() as _) as _) as _;
+        let height = area
+            .height()
+            .clamp(0.0, self.height.saturating_sub(area.y() as _) as _) as _;
+
+        if width == 0 || height == 0 {
+            return;
+        }
+
+        unsafe {
+            let mut ptr = self.ptr.add(y * self.width + x);
+            core::slice::from_raw_parts_mut(ptr, width).fill(color);
+            for _ in 1..height {
+                let src = ptr;
+                ptr = ptr.add(self.width);
+                src.copy_to_nonoverlapping(ptr, width);
+            }
         }
     }
 
