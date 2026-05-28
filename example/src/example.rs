@@ -126,6 +126,15 @@ pub extern "C" fn main() -> ! {
         mouse_pos: Point::new(display_width / 2.0, display_height / 2.0),
     };
 
+    framebuffer::composite(
+        [
+            (&mut bottom_fb, Point::ORIGIN),
+            (&mut top_fb, Point::ORIGIN),
+            (&mut mouse_fb, input_state.mouse_pos),
+        ],
+        &mut framebuffer,
+    );
+
     'main_loop: loop {
         for event in GLOBAL_INPUT_QUEUE.lock().drain() {
             let render = match event {
