@@ -1,14 +1,14 @@
 //! # Virtual I/O GPU Device
 
-use core::{
-    fmt,
-    mem::MaybeUninit,
-    sync::atomic::{AtomicU32, Ordering},
+use {
+    crate::VirtqueueMessage,
+    alloc::boxed::Box,
+    core::{
+        fmt,
+        mem::MaybeUninit,
+        sync::atomic::{AtomicU32, Ordering},
+    },
 };
-
-use {alloc::boxed::Box, log::debug};
-
-use crate::VirtqueueMessage;
 
 
 
@@ -62,7 +62,7 @@ impl Device {
         if resp.type_ == ControlType::VIRTIO_GPU_RESP_OK_NODATA as u32 {
             Ok(())
         } else {
-            debug!("Response type: {:#x}", resp.type_);
+            // log::debug!("Response type: {:#x}", resp.type_);
             Err(())
         }
     }
@@ -102,11 +102,11 @@ impl Device {
         let fb_vaddr = framebuffer.pixels.as_ptr() as usize;
         let fb_addr = virtual_to_physical_addr(fb_vaddr);
 
-        debug!(
-            "FRAMEBUFFER_ADDR: {fb_vaddr:x} .. {:x} ({} bytes) | {fb_addr:x}",
-            fb_vaddr + framebuffer.pixels.len(),
-            framebuffer.pixels.len(),
-        );
+        // log::debug!(
+        //     "FRAMEBUFFER_ADDR: {fb_vaddr:x} .. {:x} ({} bytes) | {fb_addr:x}",
+        //     fb_vaddr + framebuffer.pixels.len(),
+        //     framebuffer.pixels.len(),
+        // );
 
         self.send_control_without_response(Message {
             resource_attach_backing: ResourceAttachBacking {
