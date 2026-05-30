@@ -340,7 +340,7 @@ impl KernelMapping {
         let new_kernel_end_page = self.pages.end + user_pages.len();
         let kernel_pages_to_map = PageRange::new(self.pages.end, new_kernel_end_page);
 
-        kernel_address_space().map_pages_untracked(kernel_pages_to_map, self.flags);
+        kernel_address_space().map_pages_untracked(kernel_pages_to_map, self.flags)?;
         address_space.map_kernel_pages_to(kernel_pages_to_map, user_pages, self.flags)?;
 
         self.pages.end = new_kernel_end_page;
@@ -661,17 +661,22 @@ impl AddressSpace {
             .push((name.into(), pages));
     }
 
-    pub fn map_pages_untracked(&self, pages: PageRange, flags: PageTableFlags) {
+    pub fn map_pages_untracked(
+        &self,
+        pages: PageRange,
+        flags: PageTableFlags,
+    ) -> Result<(), MappingError> {
         let mut frame_allocator = self.frame_allocator.lock();
         let mut page_table = self.page_table.lock();
 
         for page in pages {
             let frame = frame_allocator.allocate_frame().unwrap();
             page_table
-                .map_to(page, frame, flags, &mut *frame_allocator)
-                .unwrap()
+                .map_to(page, frame, flags, &mut *frame_allocator)?
                 .flush();
         }
+
+        Ok(())
     }
 
     pub fn set_flags(
