@@ -408,7 +408,10 @@ impl Loader {
         //         .collect::<String>(),
         // );
     }
+}
 
+// Section manipulation.
+impl Loader {
     /// Get the [object](LoadedObject) with the given name.
     pub fn get_object(&self, name: &str) -> Option<Weak<Mutex<LoadedObject>>> {
         self.objects.lock().get(name).map(Arc::downgrade)
@@ -507,6 +510,39 @@ impl Loader {
         self.sections.lock().insert(name.into(), section);
     }
 
+    fn add_sections<'a, I>(&self, sections: I) -> usize
+    where
+        I: IntoIterator<Item = &'a Arc<LoadedSection>>,
+    {
+        let mut map = self.sections.lock();
+        let mut range_map = self.sections_by_addr.lock();
+        let mut added_count = 0;
+        for new_section in sections.into_iter() {
+            range_map.insert(
+                (new_section.addr, new_section.size),
+                Arc::downgrade(new_section),
+            );
+            if new_section.global {
+                if let Some(old_section) =
+                    map.insert(new_section.name.clone(), Arc::downgrade(new_section))
+                {
+                    let old_section = old_section.upgrade().unwrap();
+                    debug!(
+                        "Moved `{}` from {:x} to {:x}",
+                        old_section.name, old_section.addr, new_section.addr,
+                    );
+                } else {
+                    added_count += 1;
+                }
+            }
+        }
+
+        added_count
+    }
+}
+
+// Loading implementation.
+impl Loader {
     /// Load an object into memory.
     ///
     /// Internally, this method uses the [`GlobalObjectProvider`] to read
@@ -1144,36 +1180,6 @@ impl Loader {
         }
 
         Ok(())
-    }
-
-    fn add_sections<'a, I>(&self, sections: I) -> usize
-    where
-        I: IntoIterator<Item = &'a Arc<LoadedSection>>,
-    {
-        let mut map = self.sections.lock();
-        let mut range_map = self.sections_by_addr.lock();
-        let mut added_count = 0;
-        for new_section in sections.into_iter() {
-            range_map.insert(
-                (new_section.addr, new_section.size),
-                Arc::downgrade(new_section),
-            );
-            if new_section.global {
-                if let Some(old_section) =
-                    map.insert(new_section.name.clone(), Arc::downgrade(new_section))
-                {
-                    let old_section = old_section.upgrade().unwrap();
-                    debug!(
-                        "Moved `{}` from {:x} to {:x}",
-                        old_section.name, old_section.addr, new_section.addr,
-                    );
-                } else {
-                    added_count += 1;
-                }
-            }
-        }
-
-        added_count
     }
 }
 
