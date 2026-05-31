@@ -1,0 +1,10 @@
+[package]
+name = "uart-16550"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+path = "src/uart_16550.rs"
+
+[dependencies]
+x86-port = { path = "../x86-port" }

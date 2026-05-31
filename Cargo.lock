@@ -254,6 +254,7 @@ dependencies = [
  "rustc-hash",
  "spin-mutex",
  "time",
+ "uart-16550",
  "virtio",
  "x2apic",
  "x86-port",
@@ -474,6 +475,13 @@ dependencies = [
 [[package]]
 name = "time"
 version = "0.1.0"
+
+[[package]]
+name = "uart-16550"
+version = "0.1.0"
+dependencies = [
+ "x86-port",
+]
 
 [[package]]
 name = "uart_16550"
