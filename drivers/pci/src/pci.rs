@@ -11,7 +11,7 @@ mod pci_class;
 use {
     alloc::vec::Vec,
     bit_utils::{bit_field, bit_range},
-    core::fmt::Debug,
+    core::fmt::{Debug, Display},
 };
 
 pub use {pci_capability::*, pci_class::*};
@@ -327,6 +327,54 @@ impl Debug for Device {
             .field("interrupt_pin", &self.interrupt_pin)
             // .field("capabilities", &self.capabilities())
             .finish()
+    }
+}
+
+
+
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct BarSlot {
+    pub bus: u8,
+    pub device: u8,
+    pub function: u8,
+    pub slot: u8,
+}
+
+impl Debug for BarSlot {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "{}:{}:{}.{}",
+            self.bus, self.device, self.function, self.slot,
+        )
+    }
+}
+
+impl Display for BarSlot {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl BarSlot {
+    #[inline]
+    pub const fn new(bus: u8, device: u8, function: u8, slot: u8) -> Self {
+        Self {
+            bus,
+            device,
+            function,
+            slot,
+        }
+    }
+
+    #[inline]
+    pub const fn from_device(device: &Device, slot: u8) -> Self {
+        Self {
+            bus: device.bus,
+            device: device.device,
+            function: device.function,
+            slot,
+        }
     }
 }
 

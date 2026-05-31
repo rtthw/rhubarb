@@ -187,13 +187,7 @@ pub fn init(boot_info: &BootInfo) {
                     }
                 };
 
-                TRACKER.lock().register_pci_bar(
-                    format!(
-                        "pci_bar.{}:{}:{}.{slot}",
-                        pci_device.bus, pci_device.device, pci_device.function,
-                    ),
-                    pages,
-                );
+                TRACKER.lock().register_pci_bar(&pci_device, slot, pages);
             }
         }
     }
@@ -781,7 +775,7 @@ pub struct MemoryTracker {
     spaces: HashMap<(String, Frame), Vec<(String, PageRange)>, rustc_hash::FxBuildHasher>,
     kernel_pages: PageRange,
     framebuffer_pages: PageRange,
-    pci_bar_pages: Vec<(String, PageRange)>,
+    pci_bars: HashMap<pci::BarSlot, PageRange, rustc_hash::FxBuildHasher>,
 }
 
 impl MemoryTracker {
@@ -790,7 +784,7 @@ impl MemoryTracker {
             spaces: HashMap::with_hasher(rustc_hash::FxBuildHasher),
             kernel_pages: PageRange::new(Page::new(0), Page::new(0)),
             framebuffer_pages: PageRange::new(Page::new(0), Page::new(0)),
-            pci_bar_pages: Vec::new(),
+            pci_bars: HashMap::with_hasher(rustc_hash::FxBuildHasher),
         }
     }
 
@@ -805,10 +799,19 @@ impl MemoryTracker {
         );
     }
 
-    pub fn register_pci_bar(&mut self, name: String, pages: PageRange) {
-        self.pci_bar_pages.push((name, pages));
-        self.pci_bar_pages
-            .sort_by_key(|(_name, pages)| pages.start.base_addr());
+    pub fn register_pci_bar(&mut self, device: &pci::Device, slot: u8, pages: PageRange) {
+        self.pci_bars
+            .insert(pci::BarSlot::from_device(device, slot), pages);
+    }
+
+    pub fn get_pci_bar(&self, addr: VirtualAddress) -> Option<(pci::BarSlot, PageRange)> {
+        self.pci_bars
+            .iter()
+            .find(|(_slot, pages)| {
+                pages.start.number() <= addr.page().number()
+                    && pages.end.number() > addr.page().number()
+            })
+            .map(|(slot, pages)| (*slot, *pages))
     }
 
     pub fn dump_info(&self) {
@@ -823,13 +826,13 @@ impl MemoryTracker {
             self.kernel_pages.end.base_addr(),
             self.framebuffer_pages.start.base_addr(),
             self.framebuffer_pages.end.base_addr(),
-            self.pci_bar_pages
+            self.pci_bars
                 .iter()
-                .map(|(bar_name, bar_pages)| {
+                .map(|(bar_slot, bar_pages)| {
                     format!(
-                        "    {:0>16x} {:0>16x}    {bar_name}\n",
+                        "    {:0>16x} {:0>16x}    pci_bar.{bar_slot}\n",
                         bar_pages.start.base_addr(),
-                        bar_pages.end.base_addr()
+                        bar_pages.end.base_addr(),
                     )
                 })
                 .collect::<String>(),

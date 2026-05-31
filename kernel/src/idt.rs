@@ -199,6 +199,36 @@ extern "x86-interrupt" fn page_fault_handler(
                 } else {
                     info!("Added framebuffer access to `{}`", address_space.name());
                 }
+            } else if let Some((bar_slot, bar_pages)) = crate::memory::TRACKER
+                .lock()
+                .get_pci_bar(VirtualAddress::new(addr))
+            {
+                if process.access_policy == AccessPolicy::All {
+                    // The BAR pages are already mapped into the address space, but they are not
+                    // accessible from userspace. Granting access just requires setting the flags.
+                    if let Err(error) = address_space.set_flags(
+                        bar_pages,
+                        PageTableFlags::PRESENT
+                            | PageTableFlags::WRITABLE
+                            | PageTableFlags::USER_ACCESSIBLE,
+                    ) {
+                        error!(
+                            "Failed to map PCI BAR {bar_slot} into `{}`: {error}",
+                            address_space.name(),
+                        );
+
+                        exit_process = true;
+                    } else {
+                        info!("Granted PCI BAR {bar_slot} to `{}`", address_space.name());
+                    }
+                } else {
+                    error!(
+                        "Userspace process `{}` tried to access PCI BAR {bar_slot} at {addr:x}",
+                        address_space.name(),
+                    );
+
+                    exit_process = true;
+                }
             } else {
                 error!(
                     "Userspace process `{}` tried to access a nonexistent section at {addr:x}",
