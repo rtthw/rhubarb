@@ -210,6 +210,8 @@ fn build_crate_object(workspace_dir: &Path, dir: &str, name: &str) -> Result<Exi
         .arg("--crate-type=lib")
         .arg(format!("--emit=obj={}", object_path.display()))
         .arg("-Clink-dead-code=yes")
+        .arg("-Clink-arg=-m")
+        .arg("-Clink-arg=64")
         .arg("-Zshare-generics=no")
         .status()?)
 }

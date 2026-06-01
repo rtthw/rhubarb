@@ -1289,23 +1289,6 @@ fn write_relocation(
 
     let source_addr = source_addr.to_raw() as u64;
     match relocation_entry.get_type() {
-        R_X86_64_32 | R_X86_64_32S => {
-            let target_range = target_offset..(target_offset + size_of::<u32>());
-            let target_ref = &mut target_slice[target_range];
-            let source_value = source_addr.wrapping_add(relocation_entry.get_addend()) as u32;
-
-            target_ref.copy_from_slice(&source_value.to_ne_bytes());
-        }
-        R_X86_64_PC32 | R_X86_64_PLT32 => {
-            let target_range = target_offset..(target_offset + size_of::<u32>());
-            let target_ref = &mut target_slice[target_range];
-            let source_value = source_addr
-                .wrapping_add(relocation_entry.get_addend())
-                .wrapping_sub(target_ref.as_ptr() as usize as u64)
-                as u32;
-
-            target_ref.copy_from_slice(&source_value.to_ne_bytes());
-        }
         R_X86_64_64 => {
             let target_range = target_offset..(target_offset + size_of::<u64>());
             let target_ref = &mut target_slice[target_range];
@@ -1316,13 +1299,16 @@ fn write_relocation(
         R_X86_64_PC64 => {
             let target_range = target_offset..(target_offset + size_of::<u64>());
             let target_ref = &mut target_slice[target_range];
-            let source_val = source_addr
+            let source_value = source_addr
                 .wrapping_add(relocation_entry.get_addend())
                 .wrapping_sub(target_ref.as_ptr() as usize as u64);
 
-            target_ref.copy_from_slice(&source_val.to_ne_bytes());
+            target_ref.copy_from_slice(&source_value.to_ne_bytes());
         }
 
+        R_X86_64_32 | R_X86_64_32S | R_X86_64_PC32 | R_X86_64_PLT32 => {
+            return Err("32-bit relocations are not supported");
+        }
         other => {
             error!("Unsupported relocation type: {other}");
             return Err("unsupported relocation type");
