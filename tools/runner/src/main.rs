@@ -16,6 +16,7 @@ const OBJECT_SOURCES: &[(&str, &str)] = &[
     ("crates", "heap"),
     ("crates", "input"),
     ("crates", "math"),
+    ("crates", "panic"),
     ("crates", "process"),
     ("crates", "time"),
     ("drivers", "pit"),
@@ -118,6 +119,19 @@ fn main() -> Result<()> {
         if !ld_command.status()?.success() {
             bail!("Failed to extract `{}`", rlib_path.display());
         }
+    }
+
+    println!("Linking core language object...");
+
+    let mut ld_command = Command::new("ld");
+    ld_command
+        .arg("-r")
+        .arg("--output")
+        .arg(&format!("kernel/esp/lang.o"))
+        .arg(&format!("kernel/esp/core.o"))
+        .arg(&format!("kernel/esp/compiler_builtins.o"));
+    if !ld_command.status()?.success() {
+        bail!("Failed to link Rust language object");
     }
 
     println!("Building kernel...");

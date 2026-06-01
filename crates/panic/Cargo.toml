@@ -1,0 +1,9 @@
+[package]
+name = "panic"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+path = "src/panic.rs"
+
+[dependencies]

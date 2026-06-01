@@ -15,7 +15,6 @@ use {
     core::{
         ops::Range,
         sync::atomic::{AtomicU64, AtomicUsize, Ordering},
-        time::Duration,
     },
     elf::{
         ElfFile, ObjectFileType, SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData,
@@ -42,6 +41,7 @@ const FUNDAMENTAL_SYMBOLS: &[&str] = &[
     "__divsf3",
     "__divdf3",
     "__eqsf2",
+    "__extendhfsf2",
     "__fixsfsi",
     "__fixunssfdi",
     "__floatdidf",
@@ -51,10 +51,13 @@ const FUNDAMENTAL_SYMBOLS: &[&str] = &[
     "__gedf2",
     "__gesf2",
     "__gtsf2",
+    "__ltdf2",
     "__muldf3",
     "__mulsf3",
+    "__nedf2",
     "__nesf2",
     "__subsf3",
+    "__truncsfhf2",
     "__udivti3",
     "__umodti3",
     "__unordsf2",
@@ -184,12 +187,18 @@ where
 }
 
 fn init_fundamental_symbols() {
-    let dummy_addr_space = AddressSpace::new("load_fundamental", None);
-
+    global_loader()
+        .load_object(
+            "panic",
+            &AddressSpace::new("load_panic", None),
+            // The actual value of this address doesn't matter.
+            Page::containing_addr(VirtualAddress::new(0x3333_0000_0000)),
+        )
+        .unwrap();
     let object = global_loader()
         .load_object(
-            "compiler_builtins",
-            &dummy_addr_space,
+            "lang",
+            &AddressSpace::new("load_fundamental", None),
             // The actual value of this address doesn't matter.
             Page::containing_addr(VirtualAddress::new(0x2222_0000_0000)),
         )
@@ -470,6 +479,24 @@ impl Loader {
         //       to load. I think it's some weird edge case with object section loading.
         if name == "<usize as core::fmt::Display>::fmt" {
             let ref_name = "<&usize as core::fmt::Display>::fmt";
+            trace!("Adding alias `{name}` to `{ref_name}`");
+            let Some(section) = self.sections.lock().get(&*ref_name).cloned() else {
+                unreachable!();
+            };
+            self.add_alias_to_section(&name, section.clone());
+
+            return Ok(section);
+        } else if name == "<u64 as core::fmt::LowerHex>::fmt" {
+            let ref_name = "<usize as core::fmt::LowerHex>::fmt";
+            trace!("Adding alias `{name}` to `{ref_name}`");
+            let Some(section) = self.sections.lock().get(&*ref_name).cloned() else {
+                unreachable!();
+            };
+            self.add_alias_to_section(&name, section.clone());
+
+            return Ok(section);
+        } else if name == "<u64 as core::fmt::UpperHex>::fmt" {
+            let ref_name = "<usize as core::fmt::UpperHex>::fmt";
             trace!("Adding alias `{name}` to `{ref_name}`");
             let Some(section) = self.sections.lock().get(&*ref_name).cloned() else {
                 unreachable!();
@@ -1135,25 +1162,11 @@ impl Loader {
                                     "couldn't upgrade section reference for relocation entry",
                                 ),
                                 Err(error) => {
-                                    // HACK: For now, fully relocating libcore isn't entirely
-                                    //       possible because many of the math symbols just aren't
-                                    //       supported yet. Remove this when they are.
-                                    if &*object.name == "core" {
-                                        let start = time::now();
-                                        while time::now().duration_since(start)
-                                            < Duration::from_millis(1)
-                                        {
-                                            core::hint::spin_loop();
-                                        }
-                                        continue;
-                                    } else {
-                                        error!(
-                                            "Couldn't get relocation section for `{}` <- `{}`: \
-                                            {error}",
-                                            target_section.name, demangled_name,
-                                        );
-                                        return Err(error);
-                                    }
+                                    error!(
+                                        "Couldn't get relocation section for `{}` <- `{}`: {error}",
+                                        target_section.name, demangled_name,
+                                    );
+                                    return Err(error);
                                 }
                             }?;
 
