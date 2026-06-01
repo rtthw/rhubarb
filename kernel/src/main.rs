@@ -12,7 +12,6 @@ mod ata;
 mod gdt;
 mod hpet;
 mod idt;
-mod input;
 mod loader;
 mod memory;
 mod scheduler;
@@ -85,11 +84,6 @@ pub extern "sysv64" fn main(boot_info: &'static BootInfo) -> ! {
     // Run the example program.
     scheduler::with_scheduler(|scheduler| {
         scheduler.run_user_process("example", None, true, scheduler::AccessPolicy::All);
-    });
-
-    // Run the core kernel processes.
-    scheduler::with_scheduler(|scheduler| {
-        scheduler.run_kernel_process("input_dispatcher", input::dispatch_input_events as _, None);
     });
 
     memory::TRACKER.lock().dump_info();
