@@ -230,12 +230,42 @@ extern "x86-interrupt" fn page_fault_handler(
                     exit_process = true;
                 }
             } else {
-                error!(
-                    "Userspace process `{}` tried to access a nonexistent section at {addr:x}",
-                    address_space.name(),
-                );
+                // HACK: This should check if `addr` is a physical address pointing to the
+                //       current process's heap.
+                if addr > 20000 && process.access_policy == AccessPolicy::All {
+                    let page = VirtualAddress::new(addr).page();
+                    if let Err(error) = address_space.set_flags(
+                        PageRange::from_start_len(page, 1),
+                        PageTableFlags::PRESENT
+                            | PageTableFlags::WRITABLE
+                            | PageTableFlags::USER_ACCESSIBLE,
+                    ) {
+                        error!(
+                            "Failed to map page at {addr:x} into `{}`: {error}",
+                            address_space.name(),
+                        );
 
-                exit_process = true;
+                        exit_process = true;
+                    } else {
+                        info!(
+                            "Granted access to page at {addr:x} to `{}`",
+                            address_space.name(),
+                        );
+                    }
+                } else {
+                    let instruction_addr =
+                        VirtualAddress::new(stack_frame.instruction_pointer.as_u64() as _);
+                    let instruction_section = global_loader()
+                        .get_section_for_addr(instruction_addr)
+                        .and_then(|section| section.upgrade());
+                    error!(
+                        "Userspace process `{}` tried to access a nonexistent section at {addr:x} \
+                        while executing `{instruction_section:?}` at {instruction_addr:x}",
+                        address_space.name(),
+                    );
+
+                    exit_process = true;
+                }
             }
         });
 

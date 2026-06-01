@@ -600,6 +600,7 @@ impl AddressSpace {
             // it we can still access memory while in ring 0.
             // TODO: The kernel should be mapped in the higher half.
             page_table[KERNEL_L4_INDEX] = kernel_table[KERNEL_L4_INDEX].clone();
+            page_table[KERNEL_L4_INDEX + 1] = kernel_table[KERNEL_L4_INDEX + 1].clone();
             page_table[KERNEL_HEAP_L4_INDEX] = kernel_table[KERNEL_HEAP_L4_INDEX].clone();
         }
 

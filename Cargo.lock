@@ -216,6 +216,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "input-driver"
+version = "0.1.0"
+dependencies = [
+ "heap",
+ "input",
+ "pci",
+ "process",
+ "virtio",
+]
+
+[[package]]
 name = "io"
 version = "0.1.0"
 

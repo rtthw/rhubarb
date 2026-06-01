@@ -5,6 +5,7 @@ members = [
     "crates/*",
     "drivers/*",
     "example",
+    "example/apps/*",
     "kernel",
     "tools/runner",
 ]

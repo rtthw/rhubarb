@@ -19,8 +19,11 @@ const OBJECT_SOURCES: &[(&str, &str)] = &[
     ("crates", "panic"),
     ("crates", "process"),
     ("crates", "time"),
+    ("drivers", "pci"),
     ("drivers", "pit"),
+    ("drivers", "virtio"),
     ("", "example"),
+    ("example/apps", "input-driver"),
 ];
 const LANG_DEPS: &[&str] = &["core", "alloc", "compiler_builtins"];
 
