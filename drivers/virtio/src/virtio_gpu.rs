@@ -19,13 +19,9 @@ pub struct Device {
 }
 
 impl Device {
-    pub fn new(
-        pci_device: pci::Device,
-        virtual_to_physical_addr: &impl Fn(usize) -> usize,
-    ) -> Result<Self, &'static str> {
+    pub fn new(pci_device: pci::Device) -> Result<Self, &'static str> {
         let mut virtio_device = super::Device::new(pci_device)?;
-        let control_queue =
-            virtio_device.initialize(0, |dev| dev.initialize_queue(0, virtual_to_physical_addr));
+        let control_queue = virtio_device.initialize(0, |dev| dev.initialize_queue(0));
 
         Ok(Self {
             virtio_device,

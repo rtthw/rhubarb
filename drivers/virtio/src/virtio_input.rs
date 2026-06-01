@@ -21,13 +21,9 @@ impl Device {
     /// Returns `Err` if the given PCI device is not a VirtIO input device (i.e.
     /// it doesn't have the correct configuration, or isn't an input
     /// device).
-    pub fn new(
-        pci_device: pci::Device,
-        virtual_to_physical_addr: &impl Fn(usize) -> usize,
-    ) -> Result<Self, &'static str> {
+    pub fn new(pci_device: pci::Device) -> Result<Self, &'static str> {
         let mut virtio_device = crate::Device::new(pci_device)?;
-        let mut event_queue =
-            virtio_device.initialize(0, |dev| dev.initialize_queue(0, virtual_to_physical_addr));
+        let mut event_queue = virtio_device.initialize(0, |dev| dev.initialize_queue(0));
 
         let msg = [VirtqueueMessage::<InputEvent>::DeviceWrite];
         unsafe { while event_queue.push(&msg).is_ok() {} };

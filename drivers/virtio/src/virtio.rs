@@ -132,14 +132,13 @@ impl Device {
     pub fn initialize_queue<const QUEUE_SIZE: usize, const BUFFER_SIZE: usize>(
         &mut self,
         index: u16,
-        virtual_to_physical_addr: &impl Fn(usize) -> usize,
     ) -> Virtqueue<QUEUE_SIZE, BUFFER_SIZE> {
         let mut storage = Box::new(VirtqueueStorage::new());
 
         for desc in storage.descriptor_area.0.iter_mut() {
             let buffer = Box::new([0u8; BUFFER_SIZE]);
             let buf_ref = Box::leak(buffer);
-            let addr = virtual_to_physical_addr(buf_ref.as_mut_ptr().addr());
+            let addr = process::translate_address(buf_ref.as_mut_ptr().addr()).unwrap();
 
             unsafe {
                 write_volatile(&mut desc.addr, addr as u64);
@@ -147,11 +146,12 @@ impl Device {
         }
 
         let desc_area_addr =
-            virtual_to_physical_addr(storage.descriptor_area.0.as_ref().as_ptr().addr()) as u64;
+            process::translate_address(storage.descriptor_area.0.as_ref().as_ptr().addr()).unwrap()
+                as u64;
         let driver_area_addr =
-            virtual_to_physical_addr((&storage.driver_area) as *const _ as usize) as u64;
+            process::translate_address((&storage.driver_area) as *const _ as usize).unwrap() as u64;
         let device_area_addr =
-            virtual_to_physical_addr((&storage.device_area) as *const _ as usize) as u64;
+            process::translate_address((&storage.device_area) as *const _ as usize).unwrap() as u64;
 
         unsafe {
             let c = &mut self.common_config;

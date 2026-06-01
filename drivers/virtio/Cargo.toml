@@ -8,3 +8,4 @@ path = "src/virtio.rs"
 
 [dependencies]
 pci = { path = "../pci" }
+process = { path = "../../crates/process" }
