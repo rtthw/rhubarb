@@ -23,19 +23,23 @@ use {
 
 
 
-// TODO: Choose a less arbitraty number.
+// TODO: Choose a less arbitrary number.
 pub const BASE_ADDR: usize = 0x2222_0000_0000;
+pub const DEFAULT_SIZE: usize = 8 * memory_types::MEBIBYTE;
 
-pub fn init() {
-    unsafe {
-        ALLOCATOR.0.lock().init(BASE_ADDR, memory_types::GIBIBYTE);
+pub struct Allocator(Mutex<llff::Heap>);
+
+impl Allocator {
+    pub const fn new() -> Self {
+        Self(Mutex::new(llff::Heap::empty()))
+    }
+
+    pub unsafe fn init(&self, base_addr: usize, size: usize) {
+        unsafe {
+            self.0.lock().init(base_addr, size);
+        }
     }
 }
-
-#[global_allocator]
-static ALLOCATOR: Allocator = Allocator(Mutex::new(llff::Heap::empty()));
-
-struct Allocator(Mutex<llff::Heap>);
 
 unsafe impl GlobalAlloc for Allocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {

@@ -5,7 +5,7 @@
 use {
     core::sync::atomic::Ordering,
     framebuffer::Color,
-    heap::string::ToString as _,
+    heap::{Allocator, string::ToString as _},
     input::{GLOBAL_INPUT_QUEUE, InputEvent},
     math::{Area, Point, Size},
 };
@@ -35,8 +35,13 @@ static POINTER_IMAGE: [[Color; POINTER_HEIGHT]; POINTER_WIDTH] = {
     ]
 };
 
+#[global_allocator]
+static ALLOCATOR: Allocator = Allocator::new();
+
 pub extern "C" fn main() -> ! {
-    heap::init();
+    unsafe {
+        ALLOCATOR.init(heap::BASE_ADDR, heap::DEFAULT_SIZE);
+    }
 
     let string = "EXAMPLE".to_string();
     if string.chars().nth(2) != Some('A') {
