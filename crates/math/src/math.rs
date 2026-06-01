@@ -48,6 +48,7 @@ impl Axis {
 //       `kernel/loader::init` for more information.
 
 #[unsafe(export_name = "__ltsf2")]
+#[inline(never)]
 pub extern "C" fn __ltsf2(a: f32, b: f32) -> CmpResult {
     __lesf2(a, b)
 }
@@ -55,7 +56,6 @@ pub extern "C" fn __ltsf2(a: f32, b: f32) -> CmpResult {
 // Shamelessly copied from:
 //  https://github.com/rust-lang/rust/blob/1d72d7e8136faaebad3a85eeed432e6ea1b2ffab/library/compiler-builtins/compiler-builtins/src/float/cmp.rs#L68
 #[unsafe(export_name = "__lesf2")]
-#[inline(never)]
 pub extern "C" fn __lesf2(a: f32, b: f32) -> CmpResult {
     let abs_mask = F32_SIGN_MASK - 1;
 
