@@ -296,8 +296,6 @@ impl Scheduler {
             .load_object(&name, &address_space, user_code_page)
             .unwrap();
 
-        global_loader().dump_info();
-
         let entry_point_section = global_loader()
             .get_text_section(&name, "main")
             .unwrap()

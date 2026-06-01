@@ -358,6 +358,7 @@ impl Loader {
     }
 
     /// Dump debug information to the logger.
+    #[allow(unused)]
     pub fn dump_info(&self) {
         let objects = self.objects.lock();
         // let sections = self.sections.lock();
@@ -523,14 +524,14 @@ impl Loader {
                 Arc::downgrade(new_section),
             );
             if new_section.global {
-                if let Some(old_section) =
+                if let Some(_old_section) =
                     map.insert(new_section.name.clone(), Arc::downgrade(new_section))
                 {
-                    let old_section = old_section.upgrade().unwrap();
-                    debug!(
-                        "Moved `{}` from {:x} to {:x}",
-                        old_section.name, old_section.addr, new_section.addr,
-                    );
+                    // let old_section = old_section.upgrade().unwrap();
+                    // debug!(
+                    //     "Moved `{}` from {:x} to {:x}",
+                    //     old_section.name, old_section.addr, new_section.addr,
+                    // );
                 } else {
                     added_count += 1;
                 }
