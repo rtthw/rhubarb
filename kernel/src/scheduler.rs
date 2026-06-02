@@ -221,6 +221,7 @@ impl Scheduler {
     ///   function must be diverging.
     /// - `stack_size`, a size for the new process's stack. If `None` is
     ///   provided, the [`DEFAULT_KERNEL_STACK_SIZE`] will be used.
+    #[allow(unused)]
     pub fn run_kernel_process(
         &mut self,
         name: impl Into<String>,
@@ -426,23 +427,16 @@ define_interrupt_handler_with_context!(|translate_addr_interrupt_handler| {
 
         let virt_addr = VirtualAddress::new(context.registers.rdi as usize);
         if let Some(phys_addr) = current.address_space.translate_address(virt_addr) {
-            log::trace!(
-                "Translating {virt_addr:x} >> {phys_addr:x} for `{}`",
-                current.name,
-            );
+            // log::trace!(
+            //     "Translating {virt_addr:x} >> {phys_addr:x} for `{}`",
+            //     current.name,
+            // );
             context.registers.rax = phys_addr.to_raw() as u64;
         } else {
             context.registers.rax = (-2_i64).cast_unsigned();
         }
     });
 });
-
-/// Defer execution to the scheduler.
-pub fn defer() {
-    unsafe {
-        core::arch::asm!("int 0x40");
-    }
-}
 
 /// Exit the current process.
 pub fn exit(code: i64) {
