@@ -32,7 +32,7 @@ pub const DEVICE_STATUS_FEATURES_OK: u8 = 8;
 pub const DEVICE_STATUS_NEEDS_RESET: u8 = 64;
 pub const DEVICE_STATUS_FAILED: u8 = 128;
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct Device {
     pci_device: pci::Device,
     common_config_cap: VirtioCapability,
@@ -211,13 +211,13 @@ impl Device {
 
 
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct VirtioCapability {
     config_space_offset: u8,
     virtio_cap: VirtioPciCap,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct VirtioPciCommonCfg {
     pub device_feature_select: u32,
@@ -242,7 +242,7 @@ pub struct VirtioPciCommonCfg {
     pub queue_device: u64,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct VirtioPciCap {
     cap_vndr: u8,
@@ -274,7 +274,7 @@ fn addr_in_bar(pci_device: &pci::Device, virtio_cap: &VirtioPciCap) -> u64 {
 
 
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct Virtqueue<const QUEUE_SIZE: usize, const BUFFER_SIZE: usize> {
     index: u16,
     storage: Box<VirtqueueStorage<QUEUE_SIZE>>,
@@ -444,7 +444,7 @@ pub enum VirtqueueMessage<T: Clone + Debug + Default> {
     DeviceRead { data: T, len: Option<usize> },
 }
 
-#[derive(Debug)]
+// #[derive(Debug)]
 #[repr(C)]
 struct VirtqueueStorage<const SIZE: usize> {
     descriptor_area: VirtqueueDescTable<SIZE>,
@@ -472,7 +472,7 @@ impl<const SIZE: usize> VirtqueueStorage<SIZE> {
     }
 }
 
-#[derive(Debug)]
+// #[derive(Debug)]
 #[repr(C, align(16))]
 pub struct VirtqueueDescTable<const SIZE: usize>([VirtqueueDesc; SIZE]);
 
@@ -495,7 +495,7 @@ impl VirtqueueDesc {
     };
 }
 
-#[derive(Debug)]
+// #[derive(Debug)]
 #[repr(C, align(2))]
 struct VirtqueueAvailableRing<const SIZE: usize> {
     flags: u16,
@@ -504,7 +504,7 @@ struct VirtqueueAvailableRing<const SIZE: usize> {
     used_event: u16,
 }
 
-#[derive(Debug)]
+// #[derive(Debug)]
 #[repr(C, align(4))]
 struct VirtqueueUsedRing<const SIZE: usize> {
     flags: u16,

@@ -298,7 +298,7 @@ enum PixelFormat {
 const VIRTIO_GPU_FLAG_FENCE: u32 = 1 << 0;
 const VIRTIO_GPU_MAX_SCANOUTS: usize = 16;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct ControlHeader {
     type_: u32,
@@ -308,6 +308,18 @@ struct ControlHeader {
     context_id: u32,
     ring_index: u8,
     _padding: [u8; 3],
+}
+
+impl fmt::Debug for ControlHeader {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ControlHeader")
+            .field("type", &self.type_)
+            .field("flags", &self.flags)
+            .field("fence_id", &self.fence_id)
+            .field("context_id", &self.context_id)
+            .field("ring_index", &self.ring_index)
+            .finish()
+    }
 }
 
 impl Default for ControlHeader {
@@ -332,7 +344,7 @@ pub struct Rect {
     pub height: u32,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct DisplayInfo {
     header: ControlHeader,
@@ -387,7 +399,7 @@ pub struct ResourceFlush {
 
 const MAX_MEM_PAGES: usize = 1;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct ResourceAttachBacking {
     header: ControlHeader,
