@@ -334,7 +334,9 @@ impl KernelMapping {
         let new_kernel_end_page = self.pages.end + user_pages.len();
         let kernel_pages_to_map = PageRange::new(self.pages.end, new_kernel_end_page);
 
-        kernel_address_space().map_pages_untracked(kernel_pages_to_map, self.flags)?;
+        // HACK: This can sometimes double map on the first heap extension.
+        let _ = kernel_address_space().map_pages_untracked(kernel_pages_to_map, self.flags);
+
         address_space.map_kernel_pages_to(kernel_pages_to_map, user_pages, self.flags)?;
 
         self.pages.end = new_kernel_end_page;
