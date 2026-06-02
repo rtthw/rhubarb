@@ -165,10 +165,13 @@ dependencies = [
  "framebuffer",
  "heap",
  "input",
+ "log 0.1.0",
  "math",
  "pit",
  "process",
+ "spin-mutex",
  "time",
+ "uart-16550",
 ]
 
 [[package]]
@@ -221,6 +224,7 @@ version = "0.1.0"
 dependencies = [
  "heap",
  "input",
+ "log 0.1.0",
  "pci",
  "process",
  "virtio",

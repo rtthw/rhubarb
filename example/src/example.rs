@@ -3,11 +3,12 @@
 #![no_std]
 
 use {
-    core::sync::atomic::Ordering,
+    core::{fmt::Write as _, sync::atomic::Ordering},
     framebuffer::Color,
     heap::{Allocator, string::ToString as _},
     input::{GLOBAL_INPUT_QUEUE, InputEvent},
     math::{Area, Point, Size},
+    spin_mutex::Mutex,
 };
 
 const BG_COLOR: Color = Color::rgb(0x1E, 0x1E, 0x22);
@@ -38,10 +39,17 @@ static POINTER_IMAGE: [[Color; POINTER_HEIGHT]; POINTER_WIDTH] = {
 #[global_allocator]
 static ALLOCATOR: Allocator = Allocator::new();
 
+static SERIAL2: Mutex<uart_16550::Device> = Mutex::new(uart_16550::Device::COM2);
+
 pub extern "C" fn main() -> ! {
     unsafe {
         ALLOCATOR.init(heap::BASE_ADDR, heap::DEFAULT_SIZE);
     }
+
+    unsafe { SERIAL2.lock().init() };
+    log::set_logger(&SerialLogger).unwrap();
+
+    log::info!("Logging ready");
 
     let string = "EXAMPLE".to_string();
     if string.chars().nth(2) != Some('A') {
@@ -190,4 +198,68 @@ pub fn panic_handler(_info: &core::panic::PanicInfo<'_>) -> ! {
 
 struct InputState {
     mouse_pos: Point,
+}
+
+
+
+pub struct SerialLogger;
+
+impl log::Log for SerialLogger {
+    fn log(
+        &self,
+        level: log::LogLevel,
+        target: &str,
+        _module_path: &'static str,
+        _location: &'static core::panic::Location,
+        args: core::fmt::Arguments,
+    ) {
+        const ANSI_SGR_DIM: u8 = 2;
+        const ANSI_SGR_FG_RED: u8 = 31;
+        const ANSI_SGR_FG_GREEN: u8 = 32;
+        const ANSI_SGR_FG_YELLOW: u8 = 33;
+        const ANSI_SGR_FG_BLUE: u8 = 34;
+
+        let level_color_code = match level {
+            log::LogLevel::Error => ANSI_SGR_FG_RED,
+            log::LogLevel::Warn => ANSI_SGR_FG_YELLOW,
+            log::LogLevel::Info => ANSI_SGR_FG_GREEN,
+            log::LogLevel::Debug => ANSI_SGR_FG_BLUE,
+            log::LogLevel::Trace => ANSI_SGR_DIM,
+        };
+
+        serial_println!(
+            "\x1b[2m[{}] \x1b[{}m{}\x1b[0m",
+            target,
+            level_color_code,
+            args,
+        );
+    }
+}
+
+#[doc(hidden)]
+pub fn _print(args: core::fmt::Arguments) {
+    SERIAL2
+        .lock()
+        .write_fmt(args)
+        .expect("failed to write to serial port COM2");
+}
+
+#[macro_export]
+macro_rules! serial_print {
+    ($($arg:tt)*) => {
+        $crate::_print(format_args!($($arg)*))
+    };
+}
+
+#[macro_export]
+macro_rules! serial_println {
+    () => {
+        $crate::serial_print!("\n")
+    };
+    ($fmt:expr) => {
+        $crate::serial_print!(concat!($fmt, "\n"))
+    };
+    ($fmt:expr, $($arg:tt)*) => {
+        $crate::serial_print!(concat!($fmt, "\n"), $($arg)*)
+    };
 }

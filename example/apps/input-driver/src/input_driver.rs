@@ -29,6 +29,8 @@ pub extern "C" fn main() -> ! {
             .unwrap(),
     );
 
+    log::info!("Input driver starting...");
+
     loop {
         for input_device in virtio_inputs.iter_mut() {
             for input_event in input_device.poll() {

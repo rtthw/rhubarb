@@ -9,6 +9,7 @@ path = "src/input_driver.rs"
 [dependencies]
 heap = { path = "../../../crates/heap" }
 input = { path = "../../../crates/input" }
+log = { path = "../../../crates/log" }
 pci = { path = "../../../drivers/pci" }
 process = { path = "../../../crates/process" }
 virtio = { path = "../../../drivers/virtio" }
