@@ -716,7 +716,7 @@ impl AddressSpace {
     pub fn translate_address(&self, addr: VirtualAddress) -> Option<PhysicalAddress> {
         self.page_table
             .lock()
-            .translate(addr)
+            .translate_addr(addr)
             .ok()
             .map(|res| res.frame.base_addr() + res.offset)
     }

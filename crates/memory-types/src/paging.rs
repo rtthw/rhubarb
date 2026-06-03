@@ -6,23 +6,30 @@ use {
 };
 
 
+/// The size of an entry in a [`PageTable`].
+pub const PAGE_TABLE_ENTRY_SIZE: usize = size_of::<PageTableEntry>();
 /// The number of entries in a [`PageTable`].
-pub const ENTRIES_PER_PAGE_TABLE: usize = PAGE_SIZE / size_of::<PageTableEntry>();
+pub const ENTRIES_PER_PAGE_TABLE: usize = PAGE_SIZE / PAGE_TABLE_ENTRY_SIZE;
 /// The bit width of each page table index (9 bits).
 pub const PAGE_TABLE_INDEX_WIDTH: usize = ENTRIES_PER_PAGE_TABLE.trailing_zeros() as usize;
 /// The bit width of each page table offset (12 bits).
 pub const PAGE_TABLE_OFFSET_WIDTH: usize = PAGE_SIZE.trailing_zeros() as usize;
 
+/// The size of a huge page in a level 2 [`PageTable`].
+pub const L2_HUGE_PAGE_SIZE: usize =
+    ENTRIES_PER_PAGE_TABLE * ENTRIES_PER_PAGE_TABLE * PAGE_TABLE_ENTRY_SIZE;
+/// The size of a huge page in a level 3 page table.
 pub const L3_HUGE_PAGE_SIZE: usize = ENTRIES_PER_PAGE_TABLE
     * ENTRIES_PER_PAGE_TABLE
     * ENTRIES_PER_PAGE_TABLE
-    * size_of::<PageTableEntry>();
-pub const L2_HUGE_PAGE_SIZE: usize =
-    ENTRIES_PER_PAGE_TABLE * ENTRIES_PER_PAGE_TABLE * size_of::<PageTableEntry>();
+    * PAGE_TABLE_ENTRY_SIZE;
 
-pub const PAGES_PER_L3_HUGE_PAGE: usize = L3_HUGE_PAGE_SIZE / PAGE_SIZE;
+/// How many pages can fit within a huge page in a level 2 [`PageTable`].
 pub const PAGES_PER_L2_HUGE_PAGE: usize = L2_HUGE_PAGE_SIZE / PAGE_SIZE;
+/// How many pages can fit within a huge page in a level 3 [`PageTable`].
+pub const PAGES_PER_L3_HUGE_PAGE: usize = L3_HUGE_PAGE_SIZE / PAGE_SIZE;
 
+/// A table of [`Page`] mappings and permissions.
 #[repr(align(4096))]
 #[repr(C)]
 #[derive(Clone)]
@@ -417,7 +424,10 @@ impl Level4PageTable {
             .ok_or(TranslationError::InvalidFrameAddress(l1_entry.addr()))
     }
 
-    pub fn translate(&self, addr: VirtualAddress) -> Result<AddressTranslation, TranslationError> {
+    pub fn translate_addr(
+        &self,
+        addr: VirtualAddress,
+    ) -> Result<AddressTranslation, TranslationError> {
         let l4 = &self.inner;
         let l3 = Self::get_table(&l4[addr.l4_index()])?;
         let l2 = Self::get_table(&l3[addr.l3_index()])?;
@@ -451,6 +461,7 @@ impl ops::DerefMut for Level4PageTable {
     }
 }
 
+/// The result of calling [`Level4PageTable::translate`].
 #[derive(Debug)]
 pub struct AddressTranslation {
     pub frame: Frame,

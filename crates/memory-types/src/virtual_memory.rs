@@ -1,13 +1,14 @@
 //! # Virtual Memory
 
-use core::{
-    fmt,
-    ops::{Add, AddAssign, Deref, Sub, SubAssign},
-};
-
-use crate::{
-    ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, PAGE_TABLE_INDEX_WIDTH, PAGE_TABLE_OFFSET_WIDTH, align_down,
-    align_up,
+use {
+    crate::{
+        ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, PAGE_TABLE_INDEX_WIDTH, PAGE_TABLE_OFFSET_WIDTH,
+        align_down, align_up,
+    },
+    core::{
+        fmt,
+        ops::{Add, AddAssign, Deref, Sub, SubAssign},
+    },
 };
 
 pub const MAX_VIRTUAL_ADDR: usize = usize::MAX; // 0xFFFF_FFFF_FFFF_FFFF

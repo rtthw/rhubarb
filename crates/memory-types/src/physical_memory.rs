@@ -1,16 +1,14 @@
 //! # Physical Memory Address
 
-use core::{
-    fmt,
-    ops::{Add, AddAssign, Deref, Sub, SubAssign},
+use {
+    crate::{PAGE_SIZE, align_down, align_up},
+    core::{
+        fmt,
+        ops::{Add, AddAssign, Deref, Sub, SubAssign},
+    },
 };
 
-use crate::{PAGE_SIZE, align_down, align_up};
-
-
 pub const MAX_PHYSICAL_ADDR: usize = 0x000F_FFFF_FFFF_FFFF;
-
-
 
 /// A physical memory frame.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
