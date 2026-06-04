@@ -5,10 +5,12 @@ use {
         apic, gdt,
         loader::global_loader,
         memory::{FRAMEBUFFER_MAPPING, KernelMapping, kernel_address_space},
-        scheduler::{self, AccessPolicy, USER_HEAP_ADDR, with_scheduler},
+        scheduler::{self, AccessPolicy, with_scheduler},
     },
     log::{error, info, warn},
-    memory_types::{GIBIBYTE, PAGE_SIZE, Page, PageRange, PageTableFlags, VirtualAddress},
+    memory_types::{
+        AddressRange, GIBIBYTE, PAGE_SIZE, Page, PageRange, PageTableFlags, VirtualAddress,
+    },
     x86_64::{
         registers::control::{Cr2, Cr3},
         set_general_handler,
@@ -77,6 +79,7 @@ extern "x86-interrupt" fn page_fault_handler(
     error_code: PageFaultErrorCode,
 ) {
     let addr = Cr2::read_raw() as usize;
+    let vaddr = VirtualAddress::new(addr);
     let addr_space_frame = Cr3::read_raw().0;
 
     let user_mode = error_code.contains(PageFaultErrorCode::USER_MODE);
@@ -86,27 +89,43 @@ extern "x86-interrupt" fn page_fault_handler(
         panic!("#PF({error_code:?}) at {addr:#x} in {addr_space_frame:?} : {stack_frame:#?}");
     }
 
-    // Faulting address is in the user's heap.
-    if addr >= USER_HEAP_ADDR && addr < 0x3333_0000_0000 {
+    let range = vaddr.range();
+
+    if range == AddressRange::Invalid || vaddr.to_raw() != addr {
+        with_scheduler(|scheduler| {
+            let process = scheduler
+                .current_process_mut()
+                .expect("should have a running process during user page fault");
+            error!(
+                "Process `{}` tried to access invalid memory at {vaddr}",
+                process.name,
+            );
+        });
+        scheduler::exit(-17);
+        return;
+    }
+
+    if range == AddressRange::UserHeap {
         let mut exit_process = false;
         with_scheduler(|scheduler| {
             let process = scheduler
                 .current_process_mut()
                 .expect("should have a running process during user page fault");
 
-            let heap_offset = addr - USER_HEAP_ADDR;
+            let heap_offset = vaddr - AddressRange::UserHeap.base_addr();
 
-            if heap_offset >= 1 * GIBIBYTE {
+            if heap_offset.to_raw() >= 1 * GIBIBYTE {
                 warn!(
-                    "Process `{}` tried to allocate a heap of {heap_offset} bytes, exiting...",
+                    "Process `{}` tried to allocate a heap of {} bytes, exiting...",
                     process.name,
+                    heap_offset.to_raw(),
                 );
                 exit_process = true;
                 return;
             }
 
-            let heap_base_page = Page::containing_addr(VirtualAddress::new(USER_HEAP_ADDR));
-            let new_heap_end_page = Page::containing_addr(VirtualAddress::new(addr)) + 1;
+            let heap_base_page = Page::containing_addr(AddressRange::UserHeap.base_addr());
+            let new_heap_end_page = vaddr.page() + 1;
             if let Some(heap_mapping) = &mut process.heap_mapping {
                 // Extend the heap mapping.
 
@@ -116,17 +135,12 @@ extern "x86-interrupt" fn page_fault_handler(
 
                 if let Err(error) = heap_mapping.extend(&process.address_space, extension_pages) {
                     error!(
-                        "Failed to extend heap for process `{}` at {addr:x} to {:x}: {error}",
+                        "Failed to extend heap for process `{}` at {vaddr}: {error}",
                         process.name,
-                        new_heap_end_page.base_addr(),
                     );
                     exit_process = true;
                 } else {
-                    info!(
-                        "Extended heap for process `{}` at {addr:x} to {:x}",
-                        process.name,
-                        new_heap_end_page.base_addr(),
-                    );
+                    info!("Extended heap for process `{}` at {vaddr}", process.name);
                 }
             } else {
                 // Create a new mapping for the heap.
@@ -145,17 +159,12 @@ extern "x86-interrupt" fn page_fault_handler(
                     flags,
                 ) {
                     error!(
-                        "Failed to create heap for process `{}` at {addr:x} to {:x}: {error}",
+                        "Failed to create heap for process `{}` at {vaddr}: {error}",
                         process.name,
-                        new_heap_end_page.base_addr(),
                     );
                     exit_process = true;
                 } else {
-                    info!(
-                        "Created heap for process `{}` at {addr:x} to {:x}",
-                        process.name,
-                        new_heap_end_page.base_addr(),
-                    );
+                    info!("Created heap for process `{}`", process.name);
                     process.heap_mapping = Some(mapping);
                 }
             }
@@ -232,7 +241,7 @@ extern "x86-interrupt" fn page_fault_handler(
             } else {
                 // HACK: This should check if `addr` is a physical address pointing to the
                 //       current process's heap.
-                if addr > 20000 && process.access_policy == AccessPolicy::All {
+                if range == AddressRange::Physical && process.access_policy == AccessPolicy::All {
                     let page = VirtualAddress::new(addr).page();
                     if let Err(error) = address_space.set_flags(
                         PageRange::from_start_len(page, 1),

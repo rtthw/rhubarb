@@ -29,7 +29,6 @@ use {
 
 const IDLE_PROCESS_ID: u64 = 0;
 const USER_CODE_ADDR: usize = 0x4444_0000_0000;
-pub const USER_HEAP_ADDR: usize = 0x2222_0000_0000;
 
 pub const DEFAULT_KERNEL_STACK_SIZE: usize = PAGE_SIZE * 8;
 pub const DEFAULT_USER_STACK_SIZE: usize = PAGE_SIZE * 16;

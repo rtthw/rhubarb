@@ -8,8 +8,6 @@
 
 pub extern crate alloc;
 
-pub use alloc::*;
-
 mod alloc_shim;
 mod llff;
 
@@ -18,13 +16,16 @@ use {
         alloc::{GlobalAlloc, Layout},
         ptr::NonNull,
     },
+    memory_types::AddressRange,
     spin_mutex::Mutex,
 };
+
+pub use alloc::*;
 
 
 
 // TODO: Choose a less arbitrary number.
-pub const BASE_ADDR: usize = 0x2222_0000_0000;
+pub const BASE_ADDR: usize = AddressRange::UserHeap.base_addr().to_raw();
 pub const DEFAULT_SIZE: usize = 8 * memory_types::MEBIBYTE;
 
 pub struct Allocator(Mutex<llff::Heap>);

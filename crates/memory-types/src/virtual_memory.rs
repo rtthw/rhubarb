@@ -190,6 +190,11 @@ impl VirtualAddress {
     }
 
     #[inline]
+    pub const fn from_l4_index(l4_index: usize) -> Self {
+        Self::new(0 | (l4_index << L4_INDEX_SHIFT))
+    }
+
+    #[inline]
     pub const fn to_raw(self) -> usize {
         self.0
     }
@@ -307,6 +312,15 @@ impl fmt::UpperHex for VirtualAddress {
     }
 }
 
+impl Add for VirtualAddress {
+    type Output = Self;
+
+    #[inline]
+    fn add(self, rhs: Self) -> Self::Output {
+        Self::new(self.0.checked_add(rhs.to_raw()).unwrap())
+    }
+}
+
 impl Add<usize> for VirtualAddress {
     type Output = Self;
 
@@ -320,6 +334,15 @@ impl AddAssign<usize> for VirtualAddress {
     #[inline]
     fn add_assign(&mut self, rhs: usize) {
         *self = *self + rhs;
+    }
+}
+
+impl Sub for VirtualAddress {
+    type Output = Self;
+
+    #[inline]
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self::new(self.0.checked_sub(rhs.to_raw()).unwrap())
     }
 }
 
@@ -352,20 +375,30 @@ pub enum AddressRange {
     Invalid,
 }
 
+impl AddressRange {
+    pub const fn base_addr(&self) -> VirtualAddress {
+        match self {
+            AddressRange::Physical => VirtualAddress::from_l4_index(0),
+            AddressRange::UserStack => VirtualAddress::from_l4_index(USER_STACK_L4_INDEX),
+            AddressRange::UserHeap => VirtualAddress::from_l4_index(USER_HEAP_L4_INDEX),
+            AddressRange::KernelHeap => VirtualAddress::from_l4_index(KERNEL_HEAP_L4_INDEX),
+            AddressRange::KernelMapping => VirtualAddress::from_l4_index(KERNEL_MAPPING_L4_INDEX),
+            AddressRange::Invalid => VirtualAddress::from_l4_index(MAX_PHYSICAL_L4_INDEX + 1),
+        }
+    }
+}
+
 
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const USER_STACK_BASE: usize =
-        VirtualAddress::from_table_indices(USER_STACK_L4_INDEX, 0, 0, 0).to_raw();
-    const USER_HEAP_BASE: usize =
-        VirtualAddress::from_table_indices(USER_HEAP_L4_INDEX, 0, 0, 0).to_raw();
-    const KERNEL_HEAP_BASE: usize =
-        VirtualAddress::from_table_indices(KERNEL_HEAP_L4_INDEX, 0, 0, 0).to_raw();
+    const USER_STACK_BASE: usize = VirtualAddress::from_l4_index(USER_STACK_L4_INDEX).to_raw();
+    const USER_HEAP_BASE: usize = VirtualAddress::from_l4_index(USER_HEAP_L4_INDEX).to_raw();
+    const KERNEL_HEAP_BASE: usize = VirtualAddress::from_l4_index(KERNEL_HEAP_L4_INDEX).to_raw();
     const KERNEL_MAPPING_BASE: usize =
-        VirtualAddress::from_table_indices(KERNEL_MAPPING_L4_INDEX, 0, 0, 0).to_raw();
+        VirtualAddress::from_l4_index(KERNEL_MAPPING_L4_INDEX).to_raw();
 
     #[test]
     fn smoke() {

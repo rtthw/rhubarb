@@ -16,8 +16,8 @@ pub use {
     },
     physical_memory::{Frame, MAX_PHYSICAL_ADDR, PhysicalAddress},
     virtual_memory::{
-        MAX_VIRTUAL_ADDR, Page, VIRTUAL_MEMORY_OFFSET, VIRTUAL_MEMORY_SHIFT, VirtualAddress,
-        l4_constants::*,
+        AddressRange, MAX_VIRTUAL_ADDR, Page, VIRTUAL_MEMORY_OFFSET, VIRTUAL_MEMORY_SHIFT,
+        VirtualAddress, l4_constants::*,
     },
 };
 

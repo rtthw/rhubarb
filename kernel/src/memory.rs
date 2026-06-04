@@ -11,8 +11,9 @@ use {
     linked_list_allocator::LockedHeap,
     log::{debug, info, trace, warn},
     memory_types::{
-        Frame, FrameAllocator as DynFrameAllocator, GIBIBYTE, Level4PageTable, MEBIBYTE, PAGE_SIZE,
-        Page, PageRange, PageTable, PageTableFlags, PhysicalAddress, VirtualAddress,
+        Frame, FrameAllocator as DynFrameAllocator, GIBIBYTE, KERNEL_HEAP_L4_INDEX,
+        KERNEL_MAPPING_L4_INDEX, Level4PageTable, MAX_PHYSICAL_L4_INDEX, MEBIBYTE, PAGE_SIZE, Page,
+        PageRange, PageTable, PageTableFlags, PhysicalAddress, VirtualAddress,
         paging::MappingError,
     },
     spin_mutex::Mutex,
@@ -21,11 +22,6 @@ use {
         registers::control::{Cr0, Cr0Flags, Cr3, Cr3Flags},
     },
 };
-
-
-const KERNEL_L4_INDEX: usize = 0;
-const KERNEL_HEAP_L4_INDEX: usize = 509;
-const KERNEL_MAPPING_L4_INDEX: usize = 510;
 
 pub const KERNEL_HEAP_BASE: usize =
     VirtualAddress::from_table_indices(KERNEL_HEAP_L4_INDEX, 0, 0, 0).to_raw();
@@ -601,8 +597,9 @@ impl AddressSpace {
             // Make sure the kernel is accessible from this address space so when we enter
             // it we can still access memory while in ring 0.
             // TODO: The kernel should be mapped in the higher half.
-            page_table[KERNEL_L4_INDEX] = kernel_table[KERNEL_L4_INDEX].clone();
-            page_table[KERNEL_L4_INDEX + 1] = kernel_table[KERNEL_L4_INDEX + 1].clone();
+            for phys_l4_index in 0..=MAX_PHYSICAL_L4_INDEX {
+                page_table[phys_l4_index] = kernel_table[phys_l4_index].clone();
+            }
             page_table[KERNEL_HEAP_L4_INDEX] = kernel_table[KERNEL_HEAP_L4_INDEX].clone();
         }
 
