@@ -9,6 +9,7 @@ use {
         fmt,
         ops::{Add, AddAssign, Deref, Sub, SubAssign},
     },
+    l4_constants::*,
 };
 
 pub const MAX_VIRTUAL_ADDR: usize = usize::MAX; // 0xFFFF_FFFF_FFFF_FFFF
@@ -19,6 +20,34 @@ const L1_INDEX_SHIFT: usize = PAGE_TABLE_OFFSET_WIDTH + PAGE_TABLE_INDEX_WIDTH *
 const L2_INDEX_SHIFT: usize = PAGE_TABLE_OFFSET_WIDTH + PAGE_TABLE_INDEX_WIDTH * 1;
 const L3_INDEX_SHIFT: usize = PAGE_TABLE_OFFSET_WIDTH + PAGE_TABLE_INDEX_WIDTH * 2;
 const L4_INDEX_SHIFT: usize = PAGE_TABLE_OFFSET_WIDTH + PAGE_TABLE_INDEX_WIDTH * 3;
+
+pub mod l4_constants {
+    use super::{L4_INDEX_SHIFT, VIRTUAL_MEMORY_SHIFT};
+
+    /// The maximum valid level 4 page table index a virtual address can have
+    /// and be classified as a "physical" address (i.e. correspond to an
+    /// identity-mapped virtual address).
+    ///
+    /// The top 12 bits of all physical addresses must be 0, so the maximum L4
+    /// index is one that will never be sign-extended past bit 47 when converted
+    /// to a virtual address. Therefore, the valid bit width of the L4 index
+    /// range for physical memory is:
+    ///
+    /// ```rust,no_run
+    /// VIRTUAL_MEMORY_SHIFT - L4_INDEX_SHIFT
+    /// ```
+    ///
+    /// So, the max L4 index is:
+    ///
+    /// ```rust,no_run
+    /// (1 << (VIRTUAL_MEMORY_SHIFT - L4_INDEX_SHIFT)) - 1
+    /// ```
+    pub const MAX_PHYSICAL_L4_INDEX: usize = (1 << (VIRTUAL_MEMORY_SHIFT - L4_INDEX_SHIFT)) - 1;
+    pub const USER_STACK_L4_INDEX: usize = 507;
+    pub const USER_HEAP_L4_INDEX: usize = 508;
+    pub const KERNEL_HEAP_L4_INDEX: usize = 509;
+    pub const KERNEL_MAPPING_L4_INDEX: usize = 510;
+}
 
 /// A virtual memory page.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -166,6 +195,19 @@ impl VirtualAddress {
     }
 
     #[inline]
+    pub const fn range(&self) -> AddressRange {
+        match self.l4_index() {
+            ..=MAX_PHYSICAL_L4_INDEX => AddressRange::Physical,
+            USER_STACK_L4_INDEX => AddressRange::UserStack,
+            USER_HEAP_L4_INDEX => AddressRange::UserHeap,
+            KERNEL_HEAP_L4_INDEX => AddressRange::KernelHeap,
+            KERNEL_MAPPING_L4_INDEX => AddressRange::KernelMapping,
+
+            _ => AddressRange::Invalid,
+        }
+    }
+
+    #[inline]
     pub const fn is_page_aligned(self) -> bool {
         self.0 & (PAGE_SIZE - 1) == 0
     }
@@ -299,9 +341,31 @@ impl SubAssign<usize> for VirtualAddress {
 
 
 
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub enum AddressRange {
+    Physical,
+    UserStack,
+    UserHeap,
+    KernelHeap,
+    KernelMapping,
+    #[default]
+    Invalid,
+}
+
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const USER_STACK_BASE: usize =
+        VirtualAddress::from_table_indices(USER_STACK_L4_INDEX, 0, 0, 0).to_raw();
+    const USER_HEAP_BASE: usize =
+        VirtualAddress::from_table_indices(USER_HEAP_L4_INDEX, 0, 0, 0).to_raw();
+    const KERNEL_HEAP_BASE: usize =
+        VirtualAddress::from_table_indices(KERNEL_HEAP_L4_INDEX, 0, 0, 0).to_raw();
+    const KERNEL_MAPPING_BASE: usize =
+        VirtualAddress::from_table_indices(KERNEL_MAPPING_L4_INDEX, 0, 0, 0).to_raw();
 
     #[test]
     fn smoke() {
@@ -313,6 +377,7 @@ mod tests {
         assert!(!addr.is_page_aligned());
         assert_eq!(*addr.page_align_down(), 0x3000);
         assert_eq!(*addr.page_align_up(), 0x4000);
+        assert_eq!(addr.range(), AddressRange::Physical);
 
         let page = Page::new(7);
         assert_eq!(page.number(), 7);
@@ -320,6 +385,43 @@ mod tests {
 
         let page = Page::containing_addr(VirtualAddress::new(0x300111));
         assert_eq!(page.number(), 0x300);
+    }
+
+    #[test]
+    fn ranges() {
+        assert_eq!(
+            VirtualAddress::new(USER_STACK_BASE).range(),
+            AddressRange::UserStack,
+        );
+        assert_eq!(
+            VirtualAddress::new(USER_HEAP_BASE).range(),
+            AddressRange::UserHeap,
+        );
+        assert_eq!(
+            VirtualAddress::new(KERNEL_HEAP_BASE).range(),
+            AddressRange::KernelHeap,
+        );
+        assert_eq!(
+            VirtualAddress::new(KERNEL_MAPPING_BASE).range(),
+            AddressRange::KernelMapping,
+        );
+
+        assert_eq!(
+            VirtualAddress::new(USER_STACK_BASE - 1).range(),
+            AddressRange::Invalid,
+        );
+        assert_eq!(
+            VirtualAddress::new(USER_HEAP_BASE - 1).range(),
+            AddressRange::UserStack,
+        );
+        assert_eq!(
+            VirtualAddress::new(KERNEL_HEAP_BASE - 1).range(),
+            AddressRange::UserHeap,
+        );
+        assert_eq!(
+            VirtualAddress::new(KERNEL_MAPPING_BASE - 1).range(),
+            AddressRange::KernelHeap,
+        );
     }
 
     #[test]
@@ -333,7 +435,6 @@ mod tests {
         let addr = VirtualAddress::new(5555 << VIRTUAL_MEMORY_SHIFT);
         assert_eq!(*addr, VIRTUAL_MEMORY_OFFSET);
     }
-
 
     #[test]
     #[should_panic]
