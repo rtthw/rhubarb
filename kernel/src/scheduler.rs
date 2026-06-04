@@ -18,7 +18,7 @@ use {
         sync::atomic::{AtomicU64, Ordering},
     },
     log::{debug, info, warn},
-    memory_types::{PAGE_SIZE, Page, PageRange, PageTableFlags, VirtualAddress},
+    memory_types::{AddressRange, PAGE_SIZE, PageRange, PageTableFlags, VirtualAddress},
     spin_mutex::Mutex,
     x86_64::{
         instructions::interrupts::without_interrupts, registers::rflags::RFlags,
@@ -28,7 +28,6 @@ use {
 
 
 const IDLE_PROCESS_ID: u64 = 0;
-const USER_CODE_ADDR: usize = 0x4444_0000_0000;
 
 pub const DEFAULT_KERNEL_STACK_SIZE: usize = PAGE_SIZE * 8;
 pub const DEFAULT_USER_STACK_SIZE: usize = PAGE_SIZE * 16;
@@ -235,10 +234,10 @@ impl Scheduler {
         let address_space = AddressSpace::new(format!("{name}.{id}"), Some(kernel_address_space()));
 
         let stack_size = stack_size.unwrap_or(DEFAULT_KERNEL_STACK_SIZE);
-        let stack_top_addr = VirtualAddress::new(USER_CODE_ADDR);
+        let stack_top_addr = AddressRange::UserCode.base_addr();
         address_space.map_pages(
             format!("kernel_stack.{id}"),
-            PageRange::from_end_size(Page::containing_addr(stack_top_addr), stack_size),
+            PageRange::from_end_size(stack_top_addr.page(), stack_size),
             PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
         );
 
@@ -289,11 +288,10 @@ impl Scheduler {
         let name = name.into();
 
         let address_space = AddressSpace::new(format!("{name}.{id}"), None);
-        let user_code_addr = VirtualAddress::new(USER_CODE_ADDR);
-        let user_code_page = Page::containing_addr(user_code_addr);
+        let user_code_addr = AddressRange::UserCode.base_addr();
 
         let _object = global_loader()
-            .load_object(&name, &address_space, user_code_page)
+            .load_object(&name, &address_space, user_code_addr.page())
             .unwrap();
 
         let entry_point_section = global_loader()
@@ -304,10 +302,10 @@ impl Scheduler {
         let entry_point = user_code_addr + entry_point_section.mapping_offset;
 
         let stack_size = stack_size.unwrap_or(DEFAULT_USER_STACK_SIZE);
-        let stack_top_addr = VirtualAddress::new(USER_CODE_ADDR);
+        let stack_top_addr = AddressRange::UserCode.base_addr();
         address_space.map_pages(
             format!("user_stack.{id}"),
-            PageRange::from_end_size(Page::containing_addr(stack_top_addr), stack_size),
+            PageRange::from_end_size(stack_top_addr.page(), stack_size),
             PageTableFlags::PRESENT
                 | PageTableFlags::WRITABLE
                 | PageTableFlags::USER_ACCESSIBLE

@@ -43,7 +43,8 @@ pub mod l4_constants {
     /// (1 << (VIRTUAL_MEMORY_SHIFT - L4_INDEX_SHIFT)) - 1
     /// ```
     pub const MAX_PHYSICAL_L4_INDEX: usize = (1 << (VIRTUAL_MEMORY_SHIFT - L4_INDEX_SHIFT)) - 1;
-    pub const USER_STACK_L4_INDEX: usize = 507;
+    pub const USER_STACK_L4_INDEX: usize = 506;
+    pub const USER_CODE_L4_INDEX: usize = 507;
     pub const USER_HEAP_L4_INDEX: usize = 508;
     pub const KERNEL_HEAP_L4_INDEX: usize = 509;
     pub const KERNEL_MAPPING_L4_INDEX: usize = 510;
@@ -204,6 +205,7 @@ impl VirtualAddress {
         match self.l4_index() {
             ..=MAX_PHYSICAL_L4_INDEX => AddressRange::Physical,
             USER_STACK_L4_INDEX => AddressRange::UserStack,
+            USER_CODE_L4_INDEX => AddressRange::UserCode,
             USER_HEAP_L4_INDEX => AddressRange::UserHeap,
             KERNEL_HEAP_L4_INDEX => AddressRange::KernelHeap,
             KERNEL_MAPPING_L4_INDEX => AddressRange::KernelMapping,
@@ -368,6 +370,7 @@ impl SubAssign<usize> for VirtualAddress {
 pub enum AddressRange {
     Physical,
     UserStack,
+    UserCode,
     UserHeap,
     KernelHeap,
     KernelMapping,
@@ -380,6 +383,7 @@ impl AddressRange {
         match self {
             AddressRange::Physical => VirtualAddress::from_l4_index(0),
             AddressRange::UserStack => VirtualAddress::from_l4_index(USER_STACK_L4_INDEX),
+            AddressRange::UserCode => VirtualAddress::from_l4_index(USER_CODE_L4_INDEX),
             AddressRange::UserHeap => VirtualAddress::from_l4_index(USER_HEAP_L4_INDEX),
             AddressRange::KernelHeap => VirtualAddress::from_l4_index(KERNEL_HEAP_L4_INDEX),
             AddressRange::KernelMapping => VirtualAddress::from_l4_index(KERNEL_MAPPING_L4_INDEX),
@@ -395,6 +399,7 @@ mod tests {
     use super::*;
 
     const USER_STACK_BASE: usize = VirtualAddress::from_l4_index(USER_STACK_L4_INDEX).to_raw();
+    const USER_CODE_BASE: usize = VirtualAddress::from_l4_index(USER_CODE_L4_INDEX).to_raw();
     const USER_HEAP_BASE: usize = VirtualAddress::from_l4_index(USER_HEAP_L4_INDEX).to_raw();
     const KERNEL_HEAP_BASE: usize = VirtualAddress::from_l4_index(KERNEL_HEAP_L4_INDEX).to_raw();
     const KERNEL_MAPPING_BASE: usize =
@@ -427,6 +432,10 @@ mod tests {
             AddressRange::UserStack,
         );
         assert_eq!(
+            VirtualAddress::new(USER_CODE_BASE).range(),
+            AddressRange::UserCode,
+        );
+        assert_eq!(
             VirtualAddress::new(USER_HEAP_BASE).range(),
             AddressRange::UserHeap,
         );
@@ -444,8 +453,12 @@ mod tests {
             AddressRange::Invalid,
         );
         assert_eq!(
-            VirtualAddress::new(USER_HEAP_BASE - 1).range(),
+            VirtualAddress::new(USER_CODE_BASE - 1).range(),
             AddressRange::UserStack,
+        );
+        assert_eq!(
+            VirtualAddress::new(USER_HEAP_BASE - 1).range(),
+            AddressRange::UserCode,
         );
         assert_eq!(
             VirtualAddress::new(KERNEL_HEAP_BASE - 1).range(),
