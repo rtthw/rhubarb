@@ -24,11 +24,11 @@ Upwards of 95% of all code within modern operating systems is garbage that needs
 
 ## Background
 
-*This section outlines both the historical reasoning behind many design choices made for Rhubarb.*
+*This section outlines both the philosophy and historical reasoning behind many design choices made for Rhubarb.*
 
 ### Object-oriented programming is a failure.
 
-The current consensus surrounding object-oriented programming (OOP) is that it was a failure. It's far too slow for serious applications. In a sense, this is true. The modern understanding of OOP is a failure, but what we see today is not what OOP could/should have been.
+The current consensus surrounding object-oriented programming (OOP) is that it has failed. It's far too slow for serious applications and the abstractions it encourages are verbose and unwieldy. In a sense this is true, but it's not the full story. The *modern understanding of OOP* is a failure, but what we see today is not what OOP could/should have been.
 
 > OOP to me means only messaging, local retention and protection and hiding of state-process, and extreme late-binding of all things.
 > - Alan Kay, 2003
@@ -52,3 +52,9 @@ Calling a library function is no different from invoking a subcommand. This mean
 Resources can range from high-level abstractions (like "a window" or "a file") to individual devices (like "the PCI bus" or "hard disk 0:0").
 
 A program can request access to a resource simply by depending on it. Depending on a resource can be as simple as attempting to access it (e.g. reading from a device's I/O port) or, if the resource is more abstract, linking to whatever executable/library provides it (e.g. the window manager).
+
+### Deny by default.
+
+The security philosophy behind modern operating systems is that if some code is running, then the user must want to run. Therefore, it should be trusted. As such, systems like Linux and Windows have an "allow by default" policy for granting process capabilities. By default, processes can do things like access the filesystem, read user data, and send/receive network packets unless the user goes through the arduous process of denying access to these resources. This is unacceptable behavior.
+
+Rhubarb takes the opposite approach. Resource access is universally denied for all processes. The user has to manually grant permissions on a per-process basis.
