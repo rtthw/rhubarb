@@ -21,7 +21,7 @@ use {
         SectionHeaderType, SymbolBinding, SymbolType,
     },
     fs::FileSystem,
-    hashbrown::HashMap,
+    hashbrown::{HashMap, HashSet},
     log::{debug, error, info, trace},
     memory_types::{Page, PageRange, PageTableFlags, VirtualAddress},
     spin_mutex::Mutex,
@@ -286,11 +286,31 @@ pub struct LoadedObject {
     /// sections of this object. They can be used as keys for
     /// [`self.sections`](Self::sections).
     pub tls_sections: BTreeSet<usize>,
-    /// Objects this object depends on.
-    pub dependencies: Vec<Weak<Mutex<LoadedObject>>>,
+    /// Sections this object depends on.
+    pub dependencies: HashSet<Dependency>,
     pub executable_mapping: Option<Arc<Mutex<KernelMapping>>>,
     pub read_only_mapping: Option<Arc<Mutex<KernelMapping>>>,
     pub read_write_mapping: Option<Arc<Mutex<KernelMapping>>>,
+}
+
+#[derive(Debug)]
+pub struct Dependency {
+    pub target_section: Arc<LoadedSection>,
+    pub source_section: Arc<LoadedSection>,
+}
+
+impl PartialEq for Dependency {
+    fn eq(&self, other: &Self) -> bool {
+        self.source_section.name == other.source_section.name
+    }
+}
+
+impl Eq for Dependency {}
+
+impl core::hash::Hash for Dependency {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.source_section.name.hash(state);
+    }
 }
 
 /// An object section that has been loaded into memory.
@@ -380,7 +400,7 @@ impl Loader {
                     let object = object.lock();
                     let section_count = object.sections.len();
                     format!(
-                        "    {name}:{}\n",
+                        "    {name}:{}\n        deps:{}\n",
                         if section_count > 20 {
                             format!("\n        {section_count} sections")
                         } else {
@@ -397,6 +417,19 @@ impl Loader {
                                 })
                                 .collect::<String>()
                         },
+                        object
+                            .dependencies
+                            .iter()
+                            .map(|dep| {
+                                let source_owner = dep.source_section.owner.upgrade().unwrap();
+                                format!(
+                                    "\n            {} @ {}.{}",
+                                    dep.target_section.name,
+                                    source_owner.lock().name,
+                                    dep.source_section.name,
+                                )
+                            })
+                            .collect::<String>(),
                     )
                 })
                 .collect::<String>(),
@@ -705,7 +738,7 @@ impl Loader {
             global_sections: BTreeSet::new(),
             data_sections: BTreeSet::new(),
             tls_sections: BTreeSet::new(),
-            dependencies: Vec::new(),
+            dependencies: HashSet::new(),
             executable_mapping: executable_mapping.clone(),
             read_only_mapping: read_only_mapping.clone(),
             read_write_mapping: read_write_mapping.clone(),
@@ -1172,6 +1205,10 @@ impl Loader {
 
                             // At this point, we know `section` is some external dependency (i.e.
                             // `section.owner` != `object`).
+                            object.dependencies.insert(Dependency {
+                                target_section: target_section.clone(),
+                                source_section: section.clone(),
+                            });
                             if AUTO_MAP_DEPENDENCIES {
                                 map_dependency(&mut object, &section, address_space, mappings);
                             }
@@ -1204,8 +1241,6 @@ fn map_dependency(
     address_space: &AddressSpace,
     mappings: &mut BTreeSet<VirtualAddress>,
 ) {
-    object.dependencies.push(section.owner.clone());
-
     let owner = section
         .owner
         .upgrade()
@@ -1259,7 +1294,7 @@ fn map_dependency_sections(
     for secondary_dep in dependency.dependencies.iter() {
         map_dependency_sections(
             object,
-            &mut secondary_dep.upgrade().unwrap().lock(),
+            &mut secondary_dep.source_section.owner.upgrade().unwrap().lock(),
             address_space,
             mappings,
         );
