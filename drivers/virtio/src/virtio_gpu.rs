@@ -51,7 +51,7 @@ impl Device {
         }
     }
 
-    fn send_control_without_response(&mut self, message: Message) -> Result<(), ()> {
+    fn send_control_without_response(&mut self, message: Message) -> Result<(), u32> {
         let resp = self.send_control(message);
         let resp: ControlHeader = unsafe { resp.control_header };
         // debug!("RESPONSE: {resp:?}");
@@ -59,7 +59,7 @@ impl Device {
             Ok(())
         } else {
             // log::debug!("Response type: {:#x}", resp.type_);
-            Err(())
+            Err(resp.type_)
         }
     }
 
@@ -74,12 +74,8 @@ impl Device {
         unsafe { res.display_info_response }
     }
 
-    pub fn initialize_framebuffer(
-        &mut self,
-        framebuffer: &mut Framebuffer,
-        virtual_to_physical_addr: &impl Fn(usize) -> usize,
-    ) {
-        framebuffer.pixels.fill(0x11);
+    pub fn initialize_framebuffer(&mut self, framebuffer: &mut Framebuffer) -> Result<(), u32> {
+        framebuffer.pixels.fill(0);
 
         self.send_control_without_response(Message {
             resource_create_2d: ResourceCreate2d {
@@ -92,17 +88,7 @@ impl Device {
                 width: framebuffer.width,
                 height: framebuffer.height,
             },
-        })
-        .unwrap();
-
-        let fb_vaddr = framebuffer.pixels.as_ptr() as usize;
-        let fb_addr = virtual_to_physical_addr(fb_vaddr);
-
-        // log::debug!(
-        //     "FRAMEBUFFER_ADDR: {fb_vaddr:x} .. {:x} ({} bytes) | {fb_addr:x}",
-        //     fb_vaddr + framebuffer.pixels.len(),
-        //     framebuffer.pixels.len(),
-        // );
+        })?;
 
         self.send_control_without_response(Message {
             resource_attach_backing: ResourceAttachBacking {
@@ -115,15 +101,14 @@ impl Device {
                 entries: {
                     let mut entries = [MemEntry::default(); MAX_MEM_PAGES];
                     entries[0] = MemEntry {
-                        addr: fb_addr as u64,
+                        addr: framebuffer.pixels.as_ptr() as u64,
                         length: framebuffer.pixels.len() as u32,
                         _padding: 0,
                     };
                     entries
                 },
             },
-        })
-        .unwrap();
+        })?;
 
         self.send_control_without_response(Message {
             set_scanout: SetScanout {
@@ -140,11 +125,12 @@ impl Device {
                 scanout_id: 0,
                 resource_id: framebuffer.resource_id,
             },
-        })
-        .unwrap();
+        })?;
+
+        Ok(())
     }
 
-    pub fn flush(&mut self, framebuffer: &mut Framebuffer) {
+    pub fn flush(&mut self, framebuffer: &mut Framebuffer) -> Result<(), u32> {
         self.send_control_without_response(Message {
             transfer_to_host_2d: TransferToHost2d {
                 header: ControlHeader {
@@ -161,8 +147,7 @@ impl Device {
                 resource_id: framebuffer.resource_id,
                 _padding: 0,
             },
-        })
-        .unwrap();
+        })?;
 
         self.send_control_without_response(Message {
             resource_flush: ResourceFlush {
@@ -179,8 +164,9 @@ impl Device {
                 resource_id: framebuffer.resource_id,
                 _padding: 0,
             },
-        })
-        .unwrap();
+        })?;
+
+        Ok(())
     }
 }
 
@@ -204,6 +190,16 @@ impl Framebuffer {
             width,
             height,
         }
+    }
+
+    #[inline]
+    pub fn addr(&self) -> usize {
+        self.pixels.as_ptr().addr()
+    }
+
+    #[inline]
+    pub const fn len(&self) -> usize {
+        self.pixels.len()
     }
 }
 
