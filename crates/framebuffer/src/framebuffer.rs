@@ -464,6 +464,7 @@ impl Color {
         match format {
             PixelFormat::Bgr => (self.r as u32) << 16 | (self.g as u32) << 8 | (self.b as u32) << 0,
             PixelFormat::Rgb => (self.r as u32) << 0 | (self.g as u32) << 8 | (self.b as u32) << 16,
+            _ => unreachable!(),
         }
     }
 

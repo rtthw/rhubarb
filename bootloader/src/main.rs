@@ -238,26 +238,33 @@ fn get_display_info() -> DisplayInfo {
     let handle = boot::get_handle_for_protocol::<GraphicsOutput>().unwrap();
     let mut gop = boot::open_protocol_exclusive::<GraphicsOutput>(handle).unwrap();
 
-    // let mode = gop
-    //     .modes()
-    //     .max_by_key(|mode| mode.info().resolution())
-    //     .expect("no display mode available");
-    // gop.set_mode(&mode).unwrap();
-
     let mode = gop.current_mode_info();
     let (width, height) = mode.resolution();
+
+    let (format, addr, size) = match mode.pixel_format() {
+        uefi::proto::console::gop::PixelFormat::Rgb => (
+            boot_info::PixelFormat::Rgb,
+            gop.frame_buffer().as_mut_ptr() as u64,
+            gop.frame_buffer().size(),
+        ),
+        uefi::proto::console::gop::PixelFormat::Bgr => (
+            boot_info::PixelFormat::Bgr,
+            gop.frame_buffer().as_mut_ptr() as u64,
+            gop.frame_buffer().size(),
+        ),
+        uefi::proto::console::gop::PixelFormat::BltOnly => {
+            (boot_info::PixelFormat::None, 0_u64, 0_usize)
+        }
+        _ => panic!("unsupported pixel format"),
+    };
 
     DisplayInfo {
         width: width as u32,
         height: height as u32,
         stride: mode.stride() as u32,
-        format: match mode.pixel_format() {
-            uefi::proto::console::gop::PixelFormat::Rgb => boot_info::PixelFormat::Rgb,
-            uefi::proto::console::gop::PixelFormat::Bgr => boot_info::PixelFormat::Bgr,
-            _ => panic!("unsupported pixel format"),
-        },
-        framebuffer_addr: gop.frame_buffer().as_mut_ptr() as u64,
-        framebuffer_size: gop.frame_buffer().size(),
+        format,
+        framebuffer_addr: addr,
+        framebuffer_size: size,
     }
 }
 
