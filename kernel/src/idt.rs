@@ -9,7 +9,7 @@ use {
     },
     log::{error, info, warn},
     memory_types::{
-        AddressRange, GIBIBYTE, PAGE_SIZE, Page, PageRange, PageTableFlags, VirtualAddress,
+        AddressDomain, GIBIBYTE, PAGE_SIZE, Page, PageRange, PageTableFlags, VirtualAddress,
     },
     x86_64::{
         registers::control::{Cr2, Cr3},
@@ -89,9 +89,9 @@ extern "x86-interrupt" fn page_fault_handler(
         panic!("#PF({error_code:?}) at {addr:#x} in {addr_space_frame:?} : {stack_frame:#?}");
     }
 
-    let range = vaddr.range();
+    let domain = vaddr.domain();
 
-    if range == AddressRange::Invalid || vaddr.to_raw() != addr {
+    if domain == AddressDomain::Invalid || vaddr.to_raw() != addr {
         with_scheduler(|scheduler| {
             let process = scheduler
                 .current_process_mut()
@@ -105,14 +105,14 @@ extern "x86-interrupt" fn page_fault_handler(
         return;
     }
 
-    if range == AddressRange::UserHeap {
+    if domain == AddressDomain::UserHeap {
         let mut exit_process = false;
         with_scheduler(|scheduler| {
             let process = scheduler
                 .current_process_mut()
                 .expect("should have a running process during user page fault");
 
-            let heap_offset = vaddr - AddressRange::UserHeap.base_addr();
+            let heap_offset = vaddr - AddressDomain::UserHeap.base_addr();
 
             if heap_offset.to_raw() >= 1 * GIBIBYTE {
                 warn!(
@@ -124,7 +124,7 @@ extern "x86-interrupt" fn page_fault_handler(
                 return;
             }
 
-            let heap_base_page = Page::containing_addr(AddressRange::UserHeap.base_addr());
+            let heap_base_page = Page::containing_addr(AddressDomain::UserHeap.base_addr());
             let new_heap_end_page = vaddr.page() + 1;
             if let Some(heap_mapping) = &mut process.heap_mapping {
                 // Extend the heap mapping.
@@ -241,7 +241,7 @@ extern "x86-interrupt" fn page_fault_handler(
             } else {
                 // HACK: This should check if `addr` is a physical address pointing to the
                 //       current process's heap.
-                if range == AddressRange::Physical && process.access_policy == AccessPolicy::All {
+                if domain == AddressDomain::Physical && process.access_policy == AccessPolicy::All {
                     let page = VirtualAddress::new(addr).page();
                     if let Err(error) = address_space.set_flags(
                         PageRange::from_start_len(page, 1),

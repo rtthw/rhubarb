@@ -201,16 +201,16 @@ impl VirtualAddress {
     }
 
     #[inline]
-    pub const fn range(&self) -> AddressRange {
+    pub const fn domain(&self) -> AddressDomain {
         match self.l4_index() {
-            ..=MAX_PHYSICAL_L4_INDEX => AddressRange::Physical,
-            USER_STACK_L4_INDEX => AddressRange::UserStack,
-            USER_CODE_L4_INDEX => AddressRange::UserCode,
-            USER_HEAP_L4_INDEX => AddressRange::UserHeap,
-            KERNEL_HEAP_L4_INDEX => AddressRange::KernelHeap,
-            KERNEL_MAPPING_L4_INDEX => AddressRange::KernelMapping,
+            ..=MAX_PHYSICAL_L4_INDEX => AddressDomain::Physical,
+            USER_STACK_L4_INDEX => AddressDomain::UserStack,
+            USER_CODE_L4_INDEX => AddressDomain::UserCode,
+            USER_HEAP_L4_INDEX => AddressDomain::UserHeap,
+            KERNEL_HEAP_L4_INDEX => AddressDomain::KernelHeap,
+            KERNEL_MAPPING_L4_INDEX => AddressDomain::KernelMapping,
 
-            _ => AddressRange::Invalid,
+            _ => AddressDomain::Invalid,
         }
     }
 
@@ -367,7 +367,7 @@ impl SubAssign<usize> for VirtualAddress {
 
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-pub enum AddressRange {
+pub enum AddressDomain {
     Physical,
     UserStack,
     UserCode,
@@ -378,16 +378,16 @@ pub enum AddressRange {
     Invalid,
 }
 
-impl AddressRange {
+impl AddressDomain {
     pub const fn base_addr(&self) -> VirtualAddress {
         match self {
-            AddressRange::Physical => VirtualAddress::from_l4_index(0),
-            AddressRange::UserStack => VirtualAddress::from_l4_index(USER_STACK_L4_INDEX),
-            AddressRange::UserCode => VirtualAddress::from_l4_index(USER_CODE_L4_INDEX),
-            AddressRange::UserHeap => VirtualAddress::from_l4_index(USER_HEAP_L4_INDEX),
-            AddressRange::KernelHeap => VirtualAddress::from_l4_index(KERNEL_HEAP_L4_INDEX),
-            AddressRange::KernelMapping => VirtualAddress::from_l4_index(KERNEL_MAPPING_L4_INDEX),
-            AddressRange::Invalid => VirtualAddress::from_l4_index(MAX_PHYSICAL_L4_INDEX + 1),
+            Self::Physical => VirtualAddress::from_l4_index(0),
+            Self::UserStack => VirtualAddress::from_l4_index(USER_STACK_L4_INDEX),
+            Self::UserCode => VirtualAddress::from_l4_index(USER_CODE_L4_INDEX),
+            Self::UserHeap => VirtualAddress::from_l4_index(USER_HEAP_L4_INDEX),
+            Self::KernelHeap => VirtualAddress::from_l4_index(KERNEL_HEAP_L4_INDEX),
+            Self::KernelMapping => VirtualAddress::from_l4_index(KERNEL_MAPPING_L4_INDEX),
+            Self::Invalid => VirtualAddress::from_l4_index(MAX_PHYSICAL_L4_INDEX + 1),
         }
     }
 }
@@ -415,7 +415,7 @@ mod tests {
         assert!(!addr.is_page_aligned());
         assert_eq!(*addr.page_align_down(), 0x3000);
         assert_eq!(*addr.page_align_up(), 0x4000);
-        assert_eq!(addr.range(), AddressRange::Physical);
+        assert_eq!(addr.domain(), AddressDomain::Physical);
 
         let page = Page::new(7);
         assert_eq!(page.number(), 7);
@@ -426,47 +426,47 @@ mod tests {
     }
 
     #[test]
-    fn ranges() {
+    fn domains() {
         assert_eq!(
-            VirtualAddress::new(USER_STACK_BASE).range(),
-            AddressRange::UserStack,
+            VirtualAddress::new(USER_STACK_BASE).domain(),
+            AddressDomain::UserStack,
         );
         assert_eq!(
-            VirtualAddress::new(USER_CODE_BASE).range(),
-            AddressRange::UserCode,
+            VirtualAddress::new(USER_CODE_BASE).domain(),
+            AddressDomain::UserCode,
         );
         assert_eq!(
-            VirtualAddress::new(USER_HEAP_BASE).range(),
-            AddressRange::UserHeap,
+            VirtualAddress::new(USER_HEAP_BASE).domain(),
+            AddressDomain::UserHeap,
         );
         assert_eq!(
-            VirtualAddress::new(KERNEL_HEAP_BASE).range(),
-            AddressRange::KernelHeap,
+            VirtualAddress::new(KERNEL_HEAP_BASE).domain(),
+            AddressDomain::KernelHeap,
         );
         assert_eq!(
-            VirtualAddress::new(KERNEL_MAPPING_BASE).range(),
-            AddressRange::KernelMapping,
+            VirtualAddress::new(KERNEL_MAPPING_BASE).domain(),
+            AddressDomain::KernelMapping,
         );
 
         assert_eq!(
-            VirtualAddress::new(USER_STACK_BASE - 1).range(),
-            AddressRange::Invalid,
+            VirtualAddress::new(USER_STACK_BASE - 1).domain(),
+            AddressDomain::Invalid,
         );
         assert_eq!(
-            VirtualAddress::new(USER_CODE_BASE - 1).range(),
-            AddressRange::UserStack,
+            VirtualAddress::new(USER_CODE_BASE - 1).domain(),
+            AddressDomain::UserStack,
         );
         assert_eq!(
-            VirtualAddress::new(USER_HEAP_BASE - 1).range(),
-            AddressRange::UserCode,
+            VirtualAddress::new(USER_HEAP_BASE - 1).domain(),
+            AddressDomain::UserCode,
         );
         assert_eq!(
-            VirtualAddress::new(KERNEL_HEAP_BASE - 1).range(),
-            AddressRange::UserHeap,
+            VirtualAddress::new(KERNEL_HEAP_BASE - 1).domain(),
+            AddressDomain::UserHeap,
         );
         assert_eq!(
-            VirtualAddress::new(KERNEL_MAPPING_BASE - 1).range(),
-            AddressRange::KernelHeap,
+            VirtualAddress::new(KERNEL_MAPPING_BASE - 1).domain(),
+            AddressDomain::KernelHeap,
         );
     }
 

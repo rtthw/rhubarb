@@ -16,7 +16,7 @@ use {
         alloc::{GlobalAlloc, Layout},
         ptr::NonNull,
     },
-    memory_types::AddressRange,
+    memory_types::AddressDomain,
     spin_mutex::Mutex,
 };
 
@@ -25,7 +25,7 @@ pub use alloc::*;
 
 
 // TODO: Choose a less arbitrary number.
-pub const BASE_ADDR: usize = AddressRange::UserHeap.base_addr().to_raw();
+pub const BASE_ADDR: usize = AddressDomain::UserHeap.base_addr().to_raw();
 pub const DEFAULT_SIZE: usize = 8 * memory_types::MEBIBYTE;
 
 pub struct Allocator(Mutex<llff::Heap>);
