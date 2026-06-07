@@ -31,7 +31,7 @@ impl Framebuffer {
             ptr: addr as *mut u32,
             width,
             height,
-            format: PixelFormat::Bgr,
+            format: PixelFormat::BGRX8,
         }
     }
 
@@ -51,7 +51,7 @@ impl Framebuffer {
             ptr: addr as *mut u32,
             width,
             height,
-            format: PixelFormat::Bgr,
+            format: PixelFormat::BGRX8,
         })
     }
 
@@ -462,8 +462,12 @@ impl Color {
 
     pub const fn to_u32(self, format: PixelFormat) -> u32 {
         match format {
-            PixelFormat::Bgr => (self.r as u32) << 16 | (self.g as u32) << 8 | (self.b as u32) << 0,
-            PixelFormat::Rgb => (self.r as u32) << 0 | (self.g as u32) << 8 | (self.b as u32) << 16,
+            PixelFormat::BGRX8 => {
+                (self.r as u32) << 16 | (self.g as u32) << 8 | (self.b as u32) << 0
+            }
+            PixelFormat::RGBX8 => {
+                (self.r as u32) << 0 | (self.g as u32) << 8 | (self.b as u32) << 16
+            }
             _ => unreachable!(),
         }
     }

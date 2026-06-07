@@ -37,11 +37,19 @@ pub struct DisplayInfo {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[repr(C)]
+#[repr(u32)]
 pub enum PixelFormat {
-    None = 0,
-    Rgb = 1,
-    Bgr = 2,
+    NONE = 0,
+
+    RGBA8,
+    RGBX8,
+    ARGB8,
+    XRGB8,
+
+    BGRA8,
+    BGRX8,
+    ABGR8,
+    XBGR8,
 }
 
 #[derive(Debug)]

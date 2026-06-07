@@ -243,17 +243,17 @@ fn get_display_info() -> DisplayInfo {
 
     let (format, addr, size) = match mode.pixel_format() {
         uefi::proto::console::gop::PixelFormat::Rgb => (
-            boot_info::PixelFormat::Rgb,
+            boot_info::PixelFormat::RGBX8,
             gop.frame_buffer().as_mut_ptr() as u64,
             gop.frame_buffer().size(),
         ),
         uefi::proto::console::gop::PixelFormat::Bgr => (
-            boot_info::PixelFormat::Bgr,
+            boot_info::PixelFormat::BGRX8,
             gop.frame_buffer().as_mut_ptr() as u64,
             gop.frame_buffer().size(),
         ),
         uefi::proto::console::gop::PixelFormat::BltOnly => {
-            (boot_info::PixelFormat::None, 0_u64, 0_usize)
+            (boot_info::PixelFormat::NONE, 0_u64, 0_usize)
         }
         _ => panic!("unsupported pixel format"),
     };
