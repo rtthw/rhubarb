@@ -76,8 +76,7 @@ extern "x86-interrupt" fn page_fault_handler(
     stack_frame: InterruptStackFrame,
     error_code: PageFaultErrorCode,
 ) {
-    let addr = Cr2::read_raw() as usize;
-    let vaddr = Address::new(addr);
+    let addr = Address::new(Cr2::read_raw() as usize);
     let addr_space_frame = Cr3::read_raw().0;
 
     let user_mode = error_code.contains(PageFaultErrorCode::USER_MODE);
@@ -87,15 +86,15 @@ extern "x86-interrupt" fn page_fault_handler(
         panic!("#PF({error_code:?}) at {addr:#x} in {addr_space_frame:?} : {stack_frame:#?}");
     }
 
-    let domain = vaddr.domain();
+    let domain = addr.domain();
 
-    if domain == AddressDomain::Invalid || vaddr.to_raw() != addr {
+    if domain == AddressDomain::Invalid {
         with_scheduler(|scheduler| {
             let process = scheduler
                 .current_process_mut()
                 .expect("should have a running process during user page fault");
             error!(
-                "Process `{}` tried to access invalid memory at {vaddr}",
+                "Process `{}` tried to access invalid memory at {addr}",
                 process.name,
             );
         });
@@ -110,7 +109,7 @@ extern "x86-interrupt" fn page_fault_handler(
                 .current_process_mut()
                 .expect("should have a running process during user page fault");
 
-            let heap_offset = vaddr - AddressDomain::UserHeap.base_addr();
+            let heap_offset = addr - AddressDomain::UserHeap.base_addr();
 
             if heap_offset.to_raw() >= 1 * GIBIBYTE {
                 warn!(
@@ -123,7 +122,7 @@ extern "x86-interrupt" fn page_fault_handler(
             }
 
             let heap_base_page = Page::containing_addr(AddressDomain::UserHeap.base_addr());
-            let new_heap_end_page = vaddr.page() + 1;
+            let new_heap_end_page = addr.page() + 1;
             if let Some(heap_mapping) = &mut process.heap_mapping {
                 // Extend the heap mapping.
 
@@ -133,12 +132,12 @@ extern "x86-interrupt" fn page_fault_handler(
 
                 if let Err(error) = heap_mapping.extend(&process.address_space, extension_pages) {
                     error!(
-                        "Failed to extend heap for process `{}` at {vaddr}: {error}",
+                        "Failed to extend heap for process `{}` at {addr:x}: {error}",
                         process.name,
                     );
                     exit_process = true;
                 } else {
-                    info!("Extended heap for process `{}` at {vaddr}", process.name);
+                    info!("Extended heap for process `{}` at {addr:x}", process.name);
                 }
             } else {
                 // Create a new mapping for the heap.
@@ -157,7 +156,7 @@ extern "x86-interrupt" fn page_fault_handler(
                     flags,
                 ) {
                     error!(
-                        "Failed to create heap for process `{}` at {vaddr}: {error}",
+                        "Failed to create heap for process `{}` at {addr:x}: {error}",
                         process.name,
                     );
                     exit_process = true;
@@ -176,7 +175,7 @@ extern "x86-interrupt" fn page_fault_handler(
     }
 
     let Some(section) = global_loader()
-        .get_section_for_addr(Address::new(addr))
+        .get_section_for_addr(addr)
         .and_then(|weak| weak.upgrade())
     else {
         let mut exit_process = false;
@@ -189,7 +188,8 @@ extern "x86-interrupt" fn page_fault_handler(
             let fb_addr = fb_mapping.addr().to_raw();
             let fb_mapping_end = fb_addr + fb_mapping.size;
 
-            if addr >= fb_addr && addr < fb_mapping_end {
+            let raw_addr = addr.to_raw();
+            if raw_addr >= fb_addr && raw_addr < fb_mapping_end {
                 // The framebuffer is already mapped into the address space, but it is not
                 // accessible from userspace. Granting access just requires setting the flags of
                 // the framebuffer's pages.
@@ -206,9 +206,8 @@ extern "x86-interrupt" fn page_fault_handler(
                 } else {
                     info!("Added framebuffer access to `{}`", address_space.name());
                 }
-            } else if let Some((bar_slot, bar_pages)) = crate::memory::TRACKER
-                .lock()
-                .get_pci_bar(Address::new(addr))
+            } else if let Some((bar_slot, bar_pages)) =
+                crate::memory::TRACKER.lock().get_pci_bar(addr)
             {
                 if process.access_policy == AccessPolicy::All {
                     // The BAR pages are already mapped into the address space, but they are not
@@ -240,7 +239,7 @@ extern "x86-interrupt" fn page_fault_handler(
                 // HACK: This should check if `addr` is a physical address pointing to the
                 //       current process's heap.
                 if domain == AddressDomain::Physical && process.access_policy == AccessPolicy::All {
-                    let page = Address::new(addr).page();
+                    let page = addr.page();
                     if let Err(error) = address_space.set_flags(
                         PageRange::from_start_len(page, 1),
                         PageTableFlags::PRESENT
