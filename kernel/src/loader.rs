@@ -23,7 +23,7 @@ use {
     fs::FileSystem,
     hashbrown::{HashMap, HashSet},
     log::{debug, error, info, trace},
-    memory_types::{Page, PageRange, PageTableFlags, VirtualAddress},
+    memory_types::{Page, PageRange, PageTableFlags, Address},
     spin_mutex::Mutex,
 };
 
@@ -83,7 +83,7 @@ pub fn init(boot_info: &BootInfo, fs: impl FileSystem + 'static) {
             "math",
             &AddressSpace::new("load_math", None),
             // The actual value of this address doesn't matter.
-            Page::containing_addr(VirtualAddress::new(0x3333_0000_0000)),
+            Page::containing_addr(Address::new(0x3333_0000_0000)),
         )
         .unwrap();
     for name in ["__ltsf2", "__lesf2"] {
@@ -104,7 +104,7 @@ pub fn init(boot_info: &BootInfo, fs: impl FileSystem + 'static) {
             "time",
             &AddressSpace::new("load_time", None),
             // The actual value of this address doesn't matter.
-            Page::containing_addr(VirtualAddress::new(0x3333_0000_0000)),
+            Page::containing_addr(Address::new(0x3333_0000_0000)),
         )
         .unwrap();
     global_loader()
@@ -112,7 +112,7 @@ pub fn init(boot_info: &BootInfo, fs: impl FileSystem + 'static) {
             "framebuffer",
             &AddressSpace::new("load_framebuffer", None),
             // The actual value of this address doesn't matter.
-            Page::containing_addr(VirtualAddress::new(0x3333_0000_0000)),
+            Page::containing_addr(Address::new(0x3333_0000_0000)),
         )
         .unwrap();
     global_loader()
@@ -120,7 +120,7 @@ pub fn init(boot_info: &BootInfo, fs: impl FileSystem + 'static) {
             "input",
             &AddressSpace::new("load_input", None),
             // The actual value of this address doesn't matter.
-            Page::containing_addr(VirtualAddress::new(0x3333_0000_0000)),
+            Page::containing_addr(Address::new(0x3333_0000_0000)),
         )
         .unwrap();
     global_loader()
@@ -128,7 +128,7 @@ pub fn init(boot_info: &BootInfo, fs: impl FileSystem + 'static) {
             "heap",
             &AddressSpace::new("load_heap", None),
             // The actual value of this address doesn't matter.
-            Page::containing_addr(VirtualAddress::new(0x3333_0000_0000)),
+            Page::containing_addr(Address::new(0x3333_0000_0000)),
         )
         .unwrap();
 
@@ -192,7 +192,7 @@ fn init_fundamental_symbols() {
             "panic",
             &AddressSpace::new("load_panic", None),
             // The actual value of this address doesn't matter.
-            Page::containing_addr(VirtualAddress::new(0x3333_0000_0000)),
+            Page::containing_addr(Address::new(0x3333_0000_0000)),
         )
         .unwrap();
     let object = global_loader()
@@ -200,7 +200,7 @@ fn init_fundamental_symbols() {
             "lang",
             &AddressSpace::new("load_fundamental", None),
             // The actual value of this address doesn't matter.
-            Page::containing_addr(VirtualAddress::new(0x2222_0000_0000)),
+            Page::containing_addr(Address::new(0x2222_0000_0000)),
         )
         .unwrap();
     let object_lock = object.lock();
@@ -266,7 +266,7 @@ impl<'a> ObjectProvider for &'a GlobalObjectProvider {
 pub struct Loader {
     objects: Mutex<HashMap<Arc<str>, Arc<Mutex<LoadedObject>>, rustc_hash::FxBuildHasher>>,
     sections: Mutex<HashMap<Arc<str>, Weak<LoadedSection>, rustc_hash::FxBuildHasher>>,
-    sections_by_addr: Mutex<BTreeMap<(VirtualAddress, usize), Weak<LoadedSection>>>,
+    sections_by_addr: Mutex<BTreeMap<(Address, usize), Weak<LoadedSection>>>,
 }
 
 /// An object that has been loaded into memory.
@@ -325,7 +325,7 @@ pub struct LoadedSection {
     /// The size of this section in bytes.
     pub size: usize,
     /// The memory address of this section.
-    pub addr: VirtualAddress,
+    pub addr: Address,
     /// A reference to the mapping that contains this section's data.
     pub mapping: Arc<Mutex<KernelMapping>>,
     /// The offset into [`self.mapping`](Self::mapping) at which this section's
@@ -487,7 +487,7 @@ impl Loader {
     }
 
     /// Get the first [section](LoadedSection) that contains the given address.
-    pub fn get_section_for_addr(&self, addr: VirtualAddress) -> Option<Weak<LoadedSection>> {
+    pub fn get_section_for_addr(&self, addr: Address) -> Option<Weak<LoadedSection>> {
         self.sections_by_addr
             .lock()
             .iter()
@@ -662,7 +662,7 @@ impl Loader {
         object_bytes: &'obj [u8],
         address_space: &AddressSpace,
         start_page: &mut Page,
-        mappings: &mut BTreeSet<VirtualAddress>,
+        mappings: &mut BTreeSet<Address>,
     ) -> Result<(Arc<Mutex<LoadedObject>>, ElfFile<'obj>), &'static str> {
         let elf_file = ElfFile::new(object_bytes)?;
         if elf_file.header.get_type() != ObjectFileType::Relocatable {
@@ -898,7 +898,7 @@ impl Loader {
                     name: format!("{:#}", rustc_demangle::demangle(name)).into(),
                     kind,
                     size: section_size,
-                    addr: VirtualAddress::new(0), // See below.
+                    addr: Address::new(0), // See below.
                     global: global_sections.contains(&section_index),
                     mapping: Arc::clone(&read_only_mapping),
                     mapping_offset,
@@ -1138,7 +1138,7 @@ impl Loader {
         object: &Arc<Mutex<LoadedObject>>,
         address_space: &AddressSpace,
         start_page: &mut Page,
-        mappings: &mut BTreeSet<VirtualAddress>,
+        mappings: &mut BTreeSet<Address>,
     ) -> Result<(), &'static str> {
         let mut object = object.lock();
         let symbol_table = elf_file.get_symbol_table()?;
@@ -1239,7 +1239,7 @@ fn map_dependency(
     object: &mut LoadedObject,
     section: &Arc<LoadedSection>,
     address_space: &AddressSpace,
-    mappings: &mut BTreeSet<VirtualAddress>,
+    mappings: &mut BTreeSet<Address>,
 ) {
     let owner = section
         .owner
@@ -1254,7 +1254,7 @@ fn map_dependency_sections(
     object: &mut LoadedObject,
     dependency: &mut LoadedObject,
     address_space: &AddressSpace,
-    mappings: &mut BTreeSet<VirtualAddress>,
+    mappings: &mut BTreeSet<Address>,
 ) {
     assert_ne!(object.name, dependency.name);
 
@@ -1306,7 +1306,7 @@ fn write_relocation(
     relocation_entry: &elf::Rela,
     target_slice: &mut [u8],
     target_offset: usize,
-    source_addr: VirtualAddress,
+    source_addr: Address,
 ) -> Result<(), &'static str> {
     // https://docs.rs/goblin/latest/src/goblin/elf/constants_relocation.rs.html
     const R_X86_64_64: u32 = 1;

@@ -11,10 +11,9 @@ use {
     linked_list_allocator::LockedHeap,
     log::{debug, info, trace, warn},
     memory_types::{
-        Frame, FrameAllocator as DynFrameAllocator, GIBIBYTE, KERNEL_HEAP_L4_INDEX,
+        Address, Frame, FrameAllocator as DynFrameAllocator, GIBIBYTE, KERNEL_HEAP_L4_INDEX,
         KERNEL_MAPPING_L4_INDEX, Level4PageTable, MAX_PHYSICAL_L4_INDEX, MEBIBYTE, PAGE_SIZE, Page,
-        PageRange, PageTable, PageTableFlags, PhysicalAddress, VirtualAddress,
-        paging::MappingError,
+        PageRange, PageTable, PageTableFlags, paging::MappingError,
     },
     spin_mutex::Mutex,
     x86_64::{
@@ -24,9 +23,9 @@ use {
 };
 
 pub const KERNEL_HEAP_BASE: usize =
-    VirtualAddress::from_table_indices(KERNEL_HEAP_L4_INDEX, 0, 0, 0).to_raw();
+    Address::from_table_indices(KERNEL_HEAP_L4_INDEX, 0, 0, 0).to_raw();
 pub const KERNEL_MAPPING_BASE: usize =
-    VirtualAddress::from_table_indices(KERNEL_MAPPING_L4_INDEX, 0, 0, 0).to_raw();
+    Address::from_table_indices(KERNEL_MAPPING_L4_INDEX, 0, 0, 0).to_raw();
 
 #[global_allocator]
 static mut ALLOCATOR: LockedHeap = LockedHeap::empty();
@@ -58,13 +57,13 @@ pub fn init(boot_info: &BootInfo) {
     let free_frames = {
         let mut frame_allocator = FRAME_ALLOCATOR.lock();
         frame_allocator.init(&boot_info.memory_map);
-        frame_allocator.reserve_range(PhysicalAddress::new(0), MEBIBYTE);
+        frame_allocator.reserve_range(Address::new(0), MEBIBYTE);
         frame_allocator.reserve_range(
-            PhysicalAddress::new(boot_info.kernel_start),
+            Address::new(boot_info.kernel_start),
             boot_info.kernel_end - boot_info.kernel_start,
         );
         frame_allocator.reserve_range(
-            PhysicalAddress::new(boot_info.display_info.framebuffer_addr as usize),
+            Address::new(boot_info.display_info.framebuffer_addr as usize),
             boot_info.display_info.framebuffer_addr as usize
                 + boot_info.display_info.framebuffer_size,
         );
@@ -93,7 +92,7 @@ pub fn init(boot_info: &BootInfo) {
     );
 
     let heap_size = 32 * MEBIBYTE;
-    let heap_start = VirtualAddress::new(KERNEL_HEAP_BASE);
+    let heap_start = Address::new(KERNEL_HEAP_BASE);
     let heap_pages = PageRange::from_base_size(heap_start, heap_size);
 
     // Note that we can't use `addr_space.map_pages` here because it requires a heap
@@ -134,7 +133,7 @@ pub fn init(boot_info: &BootInfo) {
 
     info!("Heap initialized successfully");
 
-    let framebuffer_addr = VirtualAddress::new(boot_info.display_info.framebuffer_addr as usize);
+    let framebuffer_addr = Address::new(boot_info.display_info.framebuffer_addr as usize);
     let framebuffer_size = boot_info.display_info.framebuffer_size;
     let framebuffer_pages = PageRange::from_base_size(framebuffer_addr, framebuffer_size);
 
@@ -165,18 +164,12 @@ pub fn init(boot_info: &BootInfo) {
                         address,
                         size,
                         prefetchable: _,
-                    } => PageRange::from_base_size(
-                        VirtualAddress::new(address as usize),
-                        size as usize,
-                    ),
+                    } => PageRange::from_base_size(Address::new(address as usize), size as usize),
                     pci::Bar::Mem64 {
                         address,
                         size,
                         prefetchable: _,
-                    } => PageRange::from_base_size(
-                        VirtualAddress::new(address as usize),
-                        size as usize,
-                    ),
+                    } => PageRange::from_base_size(Address::new(address as usize), size as usize),
                     pci::Bar::Io { address: _ } => {
                         // TODO: Register I/O port addresses?
                         continue;
@@ -243,7 +236,7 @@ pub struct KernelMapping {
 impl KernelMapping {
     pub fn new(name: impl Into<String>, size_in_bytes: usize, flags: PageTableFlags) -> Self {
         let name = name.into();
-        let addr = VirtualAddress::new(KERNEL_MAPPING_OFFSET.fetch_add(
+        let addr = Address::new(KERNEL_MAPPING_OFFSET.fetch_add(
             size_in_bytes.div_ceil(PAGE_SIZE) * PAGE_SIZE,
             Ordering::SeqCst,
         ));
@@ -262,7 +255,7 @@ impl KernelMapping {
     }
 
     #[inline]
-    pub const fn addr(&self) -> VirtualAddress {
+    pub const fn addr(&self) -> Address {
         self.pages.start.base_addr()
     }
 
@@ -386,11 +379,11 @@ impl FrameAllocator {
 
         for region in memory_map.iter() {
             if region.kind == MemoryRegionKind::Free {
-                let start_frame = Frame::containing_addr(PhysicalAddress::new(region.base));
+                let start_frame = Frame::containing_addr(Address::new(region.base));
                 let end_addr = region.base + region.size;
-                let end_frame = Frame::containing_addr(PhysicalAddress::new(end_addr));
+                let end_frame = Frame::containing_addr(Address::new(end_addr));
 
-                let first_frame = if PhysicalAddress::new(region.base).is_page_aligned() {
+                let first_frame = if Address::new(region.base).is_page_aligned() {
                     start_frame.number()
                 } else {
                     start_frame.number() + 1
@@ -410,7 +403,7 @@ impl FrameAllocator {
         self.next_free_hint = 0;
     }
 
-    pub fn reserve_range(&mut self, base: PhysicalAddress, size: usize) {
+    pub fn reserve_range(&mut self, base: Address, size: usize) {
         let start_frame = base.frame().number();
         let frame_count = size.div_ceil(PAGE_SIZE);
 
@@ -527,10 +520,8 @@ fn init_kernel_address_space() {
 
         KERNEL_ADDRESS_SPACE = Some(AddressSpace {
             name: String::new(),
-            frame: Frame::from_base_addr(PhysicalAddress::new(
-                l4_frame.start_address().as_u64() as usize
-            ))
-            .unwrap(),
+            frame: Frame::from_base_addr(Address::new(l4_frame.start_address().as_u64() as usize))
+                .unwrap(),
             frame_allocator: Mutex::new(FrameAllocatorProxy {
                 allocated_frames: Vec::new(),
             }),
@@ -577,7 +568,7 @@ impl AddressSpace {
         trace!("New address space at {frame:?} for {name:?}");
 
         let mut page_table = unsafe {
-            let l4_ptr = VirtualAddress::new(frame.base_addr().to_raw()).to_raw() as *mut PageTable;
+            let l4_ptr = Address::new(frame.base_addr().to_raw()).to_raw() as *mut PageTable;
 
             Level4PageTable::new(&mut *l4_ptr)
         };
@@ -710,7 +701,7 @@ impl AddressSpace {
         Ok(())
     }
 
-    pub fn translate_address(&self, addr: VirtualAddress) -> Option<PhysicalAddress> {
+    pub fn translate_address(&self, addr: Address) -> Option<Address> {
         self.page_table
             .lock()
             .translate_addr(addr)
@@ -790,11 +781,11 @@ impl MemoryTracker {
 
     pub fn init(&mut self, boot_info: &BootInfo) {
         self.kernel_pages = PageRange::from_base_size(
-            VirtualAddress::new(boot_info.kernel_start),
+            Address::new(boot_info.kernel_start),
             boot_info.kernel_end - boot_info.kernel_start,
         );
         self.framebuffer_pages = PageRange::from_base_size(
-            VirtualAddress::new(boot_info.display_info.framebuffer_addr as usize),
+            Address::new(boot_info.display_info.framebuffer_addr as usize),
             boot_info.display_info.framebuffer_size,
         );
     }
@@ -804,7 +795,7 @@ impl MemoryTracker {
             .insert(pci::BarSlot::from_device(device, slot), pages);
     }
 
-    pub fn get_pci_bar(&self, addr: VirtualAddress) -> Option<(pci::BarSlot, PageRange)> {
+    pub fn get_pci_bar(&self, addr: Address) -> Option<(pci::BarSlot, PageRange)> {
         self.pci_bars
             .iter()
             .find(|(_slot, pages)| {

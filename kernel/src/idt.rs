@@ -8,9 +8,7 @@ use {
         scheduler::{self, AccessPolicy, with_scheduler},
     },
     log::{error, info, warn},
-    memory_types::{
-        AddressDomain, GIBIBYTE, PAGE_SIZE, Page, PageRange, PageTableFlags, VirtualAddress,
-    },
+    memory_types::{Address, AddressDomain, GIBIBYTE, PAGE_SIZE, Page, PageRange, PageTableFlags},
     x86_64::{
         registers::control::{Cr2, Cr3},
         set_general_handler,
@@ -79,7 +77,7 @@ extern "x86-interrupt" fn page_fault_handler(
     error_code: PageFaultErrorCode,
 ) {
     let addr = Cr2::read_raw() as usize;
-    let vaddr = VirtualAddress::new(addr);
+    let vaddr = Address::new(addr);
     let addr_space_frame = Cr3::read_raw().0;
 
     let user_mode = error_code.contains(PageFaultErrorCode::USER_MODE);
@@ -178,7 +176,7 @@ extern "x86-interrupt" fn page_fault_handler(
     }
 
     let Some(section) = global_loader()
-        .get_section_for_addr(VirtualAddress::new(addr))
+        .get_section_for_addr(Address::new(addr))
         .and_then(|weak| weak.upgrade())
     else {
         let mut exit_process = false;
@@ -210,7 +208,7 @@ extern "x86-interrupt" fn page_fault_handler(
                 }
             } else if let Some((bar_slot, bar_pages)) = crate::memory::TRACKER
                 .lock()
-                .get_pci_bar(VirtualAddress::new(addr))
+                .get_pci_bar(Address::new(addr))
             {
                 if process.access_policy == AccessPolicy::All {
                     // The BAR pages are already mapped into the address space, but they are not
@@ -242,7 +240,7 @@ extern "x86-interrupt" fn page_fault_handler(
                 // HACK: This should check if `addr` is a physical address pointing to the
                 //       current process's heap.
                 if domain == AddressDomain::Physical && process.access_policy == AccessPolicy::All {
-                    let page = VirtualAddress::new(addr).page();
+                    let page = Address::new(addr).page();
                     if let Err(error) = address_space.set_flags(
                         PageRange::from_start_len(page, 1),
                         PageTableFlags::PRESENT
@@ -263,7 +261,7 @@ extern "x86-interrupt" fn page_fault_handler(
                     }
                 } else {
                     let instruction_addr =
-                        VirtualAddress::new(stack_frame.instruction_pointer.as_u64() as _);
+                        Address::new(stack_frame.instruction_pointer.as_u64() as _);
                     let instruction_section = global_loader()
                         .get_section_for_addr(instruction_addr)
                         .and_then(|section| section.upgrade());

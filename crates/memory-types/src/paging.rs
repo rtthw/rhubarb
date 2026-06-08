@@ -1,7 +1,7 @@
 //! # Paging
 
 use {
-    crate::{Frame, FrameAllocator, PAGE_SIZE, Page, PhysicalAddress, VirtualAddress},
+    crate::{Address, Frame, FrameAllocator, PAGE_SIZE, Page},
     core::{fmt, ops},
 };
 
@@ -131,10 +131,10 @@ impl PageTableEntry {
         self.flags().get(PageTableFlags::HUGE_PAGE)
     }
 
-    /// The [`PhysicalAddress`] mapped by this entry, might be zero.
+    /// The [`Address`] mapped by this entry, might be zero.
     #[inline]
-    pub fn addr(&self) -> PhysicalAddress {
-        PhysicalAddress::new(self.value & Self::ADDRESS_MASK)
+    pub fn addr(&self) -> Address {
+        Address::new(self.value & Self::ADDRESS_MASK)
     }
 
     /// The [`Frame`] mapped by this entry.
@@ -161,10 +161,10 @@ impl PageTableEntry {
         self.value = 0;
     }
 
-    /// Set this entry's [`PhysicalAddress`] with the given [`PageTableFlags`].
+    /// Set this entry's [`Address`] with the given [`PageTableFlags`].
     #[inline]
-    pub fn set_addr(&mut self, addr: PhysicalAddress, flags: PageTableFlags) {
-        assert!(addr.is_page_aligned());
+    pub fn set_addr(&mut self, addr: Address, flags: PageTableFlags) {
+        assert!(addr.is_page_aligned() && addr.is_physical());
         self.value = (addr.to_raw()) | flags.bits();
     }
 
@@ -232,7 +232,7 @@ impl PageRange {
     /// Create a page range that starts at the page containing the given base
     /// address, with the given size.
     #[inline]
-    pub fn from_base_size(base: VirtualAddress, size: usize) -> Self {
+    pub fn from_base_size(base: Address, size: usize) -> Self {
         let start = Page::containing_addr(base);
         let len = size.div_ceil(PAGE_SIZE);
         Self {
@@ -244,7 +244,7 @@ impl PageRange {
     /// Create a page range that starts at the page containing the given base
     /// address, with the given length.
     #[inline]
-    pub fn from_base_len(base: VirtualAddress, len: usize) -> Self {
+    pub fn from_base_len(base: Address, len: usize) -> Self {
         Self {
             start: Page::containing_addr(base),
             end: Page::containing_addr(base) + len,
@@ -424,10 +424,7 @@ impl Level4PageTable {
             .ok_or(TranslationError::InvalidFrameAddress(l1_entry.addr()))
     }
 
-    pub fn translate_addr(
-        &self,
-        addr: VirtualAddress,
-    ) -> Result<AddressTranslation, TranslationError> {
+    pub fn translate_addr(&self, addr: Address) -> Result<AddressTranslation, TranslationError> {
         let l4 = &self.inner;
         let l3 = Self::get_table(&l4[addr.l4_index()])?;
         let l2 = Self::get_table(&l3[addr.l3_index()])?;
@@ -524,7 +521,7 @@ impl core::error::Error for MappingError {}
 pub enum TranslationError {
     NotMapped,
     HugePage,
-    InvalidFrameAddress(PhysicalAddress),
+    InvalidFrameAddress(Address),
 }
 
 impl From<EntryFrameError> for TranslationError {

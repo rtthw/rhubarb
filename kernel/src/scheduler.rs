@@ -18,7 +18,7 @@ use {
         sync::atomic::{AtomicU64, Ordering},
     },
     log::{debug, info, warn},
-    memory_types::{AddressDomain, PAGE_SIZE, PageRange, PageTableFlags, VirtualAddress},
+    memory_types::{AddressDomain, PAGE_SIZE, PageRange, PageTableFlags, Address},
     spin_mutex::Mutex,
     x86_64::{
         instructions::interrupts::without_interrupts, registers::rflags::RFlags,
@@ -422,7 +422,7 @@ define_interrupt_handler_with_context!(|translate_addr_interrupt_handler| {
 
         // TODO: Check permissions here.
 
-        let virt_addr = VirtualAddress::new(context.registers.rdi as usize);
+        let virt_addr = Address::new(context.registers.rdi as usize);
         if let Some(phys_addr) = current.address_space.translate_address(virt_addr) {
             // log::trace!(
             //     "Translating {virt_addr:x} >> {phys_addr:x} for `{}`",

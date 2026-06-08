@@ -2,7 +2,7 @@
 
 use {
     crate::{
-        ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, PAGE_TABLE_INDEX_WIDTH, PAGE_TABLE_OFFSET_WIDTH,
+        ENTRIES_PER_PAGE_TABLE, Frame, PAGE_SIZE, PAGE_TABLE_INDEX_WIDTH, PAGE_TABLE_OFFSET_WIDTH,
         align_down, align_up,
     },
     core::{
@@ -63,7 +63,7 @@ impl Page {
     }
 
     #[inline]
-    pub const fn containing_addr(addr: VirtualAddress) -> Self {
+    pub const fn containing_addr(addr: Address) -> Self {
         Self {
             number: addr.to_raw() / PAGE_SIZE,
         }
@@ -76,7 +76,7 @@ impl Page {
         l2_index: usize,
         l1_index: usize,
     ) -> Self {
-        Self::containing_addr(VirtualAddress::from_table_indices(
+        Self::containing_addr(Address::from_table_indices(
             l4_index, l3_index, l2_index, l1_index,
         ))
     }
@@ -87,8 +87,8 @@ impl Page {
     }
 
     #[inline]
-    pub const fn base_addr(self) -> VirtualAddress {
-        unsafe { VirtualAddress::new_unchecked(self.number * PAGE_SIZE) }
+    pub const fn base_addr(self) -> Address {
+        unsafe { Address::new_unchecked(self.number * PAGE_SIZE) }
     }
 
     #[inline]
@@ -161,9 +161,11 @@ impl SubAssign<usize> for Page {
 /// An address in virtual memory.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(transparent)]
-pub struct VirtualAddress(usize);
+pub struct Address(usize);
 
-impl VirtualAddress {
+impl Address {
+    pub const PHYSICAL_MAX: Self = Self::new((1 << 47) - 1);
+
     #[inline]
     pub const fn new(addr: usize) -> Self {
         // Sign-extend the value by doing a right shift on it as an isize.
@@ -198,6 +200,16 @@ impl VirtualAddress {
     #[inline]
     pub const fn to_raw(self) -> usize {
         self.0
+    }
+
+    #[inline(always)]
+    pub const fn is_null(&self) -> bool {
+        self.0 == 0
+    }
+
+    #[inline(always)]
+    pub const fn is_physical(&self) -> bool {
+        self.0 <= Self::PHYSICAL_MAX.0
     }
 
     #[inline]
@@ -235,6 +247,11 @@ impl VirtualAddress {
     }
 
     #[inline]
+    pub const fn frame(self) -> Frame {
+        Frame::containing_addr(self)
+    }
+
+    #[inline]
     pub const fn page_offset(self) -> usize {
         self.0 % (1 << PAGE_TABLE_OFFSET_WIDTH)
     }
@@ -260,7 +277,7 @@ impl VirtualAddress {
     }
 }
 
-impl Deref for VirtualAddress {
+impl Deref for Address {
     type Target = usize;
 
     #[inline]
@@ -269,52 +286,52 @@ impl Deref for VirtualAddress {
     }
 }
 
-impl From<usize> for VirtualAddress {
+impl From<usize> for Address {
     #[inline]
     fn from(value: usize) -> Self {
         Self::new(value)
     }
 }
 
-impl fmt::Debug for VirtualAddress {
+impl fmt::Debug for Address {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:#x} (VIR)", self.0)
     }
 }
 
-impl fmt::Display for VirtualAddress {
+impl fmt::Display for Address {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:#x}", self.0)
     }
 }
 
-impl fmt::Binary for VirtualAddress {
+impl fmt::Binary for Address {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Binary::fmt(&self.0, f)
     }
 }
 
-impl fmt::Octal for VirtualAddress {
+impl fmt::Octal for Address {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Octal::fmt(&self.0, f)
     }
 }
 
-impl fmt::LowerHex for VirtualAddress {
+impl fmt::LowerHex for Address {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::LowerHex::fmt(&self.0, f)
     }
 }
 
-impl fmt::UpperHex for VirtualAddress {
+impl fmt::UpperHex for Address {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::UpperHex::fmt(&self.0, f)
     }
 }
 
-impl Add for VirtualAddress {
+impl Add for Address {
     type Output = Self;
 
     #[inline]
@@ -323,7 +340,7 @@ impl Add for VirtualAddress {
     }
 }
 
-impl Add<usize> for VirtualAddress {
+impl Add<usize> for Address {
     type Output = Self;
 
     #[inline]
@@ -332,14 +349,14 @@ impl Add<usize> for VirtualAddress {
     }
 }
 
-impl AddAssign<usize> for VirtualAddress {
+impl AddAssign<usize> for Address {
     #[inline]
     fn add_assign(&mut self, rhs: usize) {
         *self = *self + rhs;
     }
 }
 
-impl Sub for VirtualAddress {
+impl Sub for Address {
     type Output = Self;
 
     #[inline]
@@ -348,7 +365,7 @@ impl Sub for VirtualAddress {
     }
 }
 
-impl Sub<usize> for VirtualAddress {
+impl Sub<usize> for Address {
     type Output = Self;
 
     #[inline]
@@ -357,7 +374,7 @@ impl Sub<usize> for VirtualAddress {
     }
 }
 
-impl SubAssign<usize> for VirtualAddress {
+impl SubAssign<usize> for Address {
     #[inline]
     fn sub_assign(&mut self, rhs: usize) {
         *self = *self - rhs;
@@ -379,15 +396,15 @@ pub enum AddressDomain {
 }
 
 impl AddressDomain {
-    pub const fn base_addr(&self) -> VirtualAddress {
+    pub const fn base_addr(&self) -> Address {
         match self {
-            Self::Physical => VirtualAddress::from_l4_index(0),
-            Self::UserStack => VirtualAddress::from_l4_index(USER_STACK_L4_INDEX),
-            Self::UserCode => VirtualAddress::from_l4_index(USER_CODE_L4_INDEX),
-            Self::UserHeap => VirtualAddress::from_l4_index(USER_HEAP_L4_INDEX),
-            Self::KernelHeap => VirtualAddress::from_l4_index(KERNEL_HEAP_L4_INDEX),
-            Self::KernelMapping => VirtualAddress::from_l4_index(KERNEL_MAPPING_L4_INDEX),
-            Self::Invalid => VirtualAddress::from_l4_index(MAX_PHYSICAL_L4_INDEX + 1),
+            Self::Physical => Address::from_l4_index(0),
+            Self::UserStack => Address::from_l4_index(USER_STACK_L4_INDEX),
+            Self::UserCode => Address::from_l4_index(USER_CODE_L4_INDEX),
+            Self::UserHeap => Address::from_l4_index(USER_HEAP_L4_INDEX),
+            Self::KernelHeap => Address::from_l4_index(KERNEL_HEAP_L4_INDEX),
+            Self::KernelMapping => Address::from_l4_index(KERNEL_MAPPING_L4_INDEX),
+            Self::Invalid => Address::from_l4_index(MAX_PHYSICAL_L4_INDEX + 1),
         }
     }
 }
@@ -398,20 +415,19 @@ impl AddressDomain {
 mod tests {
     use super::*;
 
-    const USER_STACK_BASE: usize = VirtualAddress::from_l4_index(USER_STACK_L4_INDEX).to_raw();
-    const USER_CODE_BASE: usize = VirtualAddress::from_l4_index(USER_CODE_L4_INDEX).to_raw();
-    const USER_HEAP_BASE: usize = VirtualAddress::from_l4_index(USER_HEAP_L4_INDEX).to_raw();
-    const KERNEL_HEAP_BASE: usize = VirtualAddress::from_l4_index(KERNEL_HEAP_L4_INDEX).to_raw();
-    const KERNEL_MAPPING_BASE: usize =
-        VirtualAddress::from_l4_index(KERNEL_MAPPING_L4_INDEX).to_raw();
+    const USER_STACK_BASE: usize = Address::from_l4_index(USER_STACK_L4_INDEX).to_raw();
+    const USER_CODE_BASE: usize = Address::from_l4_index(USER_CODE_L4_INDEX).to_raw();
+    const USER_HEAP_BASE: usize = Address::from_l4_index(USER_HEAP_L4_INDEX).to_raw();
+    const KERNEL_HEAP_BASE: usize = Address::from_l4_index(KERNEL_HEAP_L4_INDEX).to_raw();
+    const KERNEL_MAPPING_BASE: usize = Address::from_l4_index(KERNEL_MAPPING_L4_INDEX).to_raw();
 
     #[test]
     fn smoke() {
-        let addr = VirtualAddress::new(PAGE_SIZE);
+        let addr = Address::new(PAGE_SIZE);
         assert!(addr.is_page_aligned());
         assert_eq!(*addr, PAGE_SIZE);
 
-        let addr = VirtualAddress::new(0x3777);
+        let addr = Address::new(0x3777);
         assert!(!addr.is_page_aligned());
         assert_eq!(*addr.page_align_down(), 0x3000);
         assert_eq!(*addr.page_align_up(), 0x4000);
@@ -421,76 +437,76 @@ mod tests {
         assert_eq!(page.number(), 7);
         assert_eq!(*page.base_addr(), 7 * PAGE_SIZE);
 
-        let page = Page::containing_addr(VirtualAddress::new(0x300111));
+        let page = Page::containing_addr(Address::new(0x300111));
         assert_eq!(page.number(), 0x300);
     }
 
     #[test]
     fn domains() {
         assert_eq!(
-            VirtualAddress::new(USER_STACK_BASE).domain(),
+            Address::new(USER_STACK_BASE).domain(),
             AddressDomain::UserStack,
         );
         assert_eq!(
-            VirtualAddress::new(USER_CODE_BASE).domain(),
+            Address::new(USER_CODE_BASE).domain(),
             AddressDomain::UserCode,
         );
         assert_eq!(
-            VirtualAddress::new(USER_HEAP_BASE).domain(),
+            Address::new(USER_HEAP_BASE).domain(),
             AddressDomain::UserHeap,
         );
         assert_eq!(
-            VirtualAddress::new(KERNEL_HEAP_BASE).domain(),
+            Address::new(KERNEL_HEAP_BASE).domain(),
             AddressDomain::KernelHeap,
         );
         assert_eq!(
-            VirtualAddress::new(KERNEL_MAPPING_BASE).domain(),
+            Address::new(KERNEL_MAPPING_BASE).domain(),
             AddressDomain::KernelMapping,
         );
 
         assert_eq!(
-            VirtualAddress::new(USER_STACK_BASE - 1).domain(),
+            Address::new(USER_STACK_BASE - 1).domain(),
             AddressDomain::Invalid,
         );
         assert_eq!(
-            VirtualAddress::new(USER_CODE_BASE - 1).domain(),
+            Address::new(USER_CODE_BASE - 1).domain(),
             AddressDomain::UserStack,
         );
         assert_eq!(
-            VirtualAddress::new(USER_HEAP_BASE - 1).domain(),
+            Address::new(USER_HEAP_BASE - 1).domain(),
             AddressDomain::UserCode,
         );
         assert_eq!(
-            VirtualAddress::new(KERNEL_HEAP_BASE - 1).domain(),
+            Address::new(KERNEL_HEAP_BASE - 1).domain(),
             AddressDomain::UserHeap,
         );
         assert_eq!(
-            VirtualAddress::new(KERNEL_MAPPING_BASE - 1).domain(),
+            Address::new(KERNEL_MAPPING_BASE - 1).domain(),
             AddressDomain::KernelHeap,
         );
     }
 
     #[test]
     fn addr_truncates() {
-        let addr = VirtualAddress::new(0);
+        let addr = Address::new(0);
         assert_eq!(*addr, 0);
-        let addr = VirtualAddress::new(1 << VIRTUAL_MEMORY_SHIFT);
+        let addr = Address::new(1 << VIRTUAL_MEMORY_SHIFT);
         assert_eq!(*addr, VIRTUAL_MEMORY_OFFSET);
-        let addr = VirtualAddress::new(43);
+        let addr = Address::new(43);
         assert_eq!(*addr, 43);
-        let addr = VirtualAddress::new(5555 << VIRTUAL_MEMORY_SHIFT);
+        let addr = Address::new(5555 << VIRTUAL_MEMORY_SHIFT);
         assert_eq!(*addr, VIRTUAL_MEMORY_OFFSET);
     }
 
     #[test]
     #[should_panic]
     fn addr_overflow() {
-        _ = VirtualAddress::new(MAX_VIRTUAL_ADDR) + 1;
+        _ = Address::new(MAX_VIRTUAL_ADDR) + 1;
     }
 
     #[test]
     #[should_panic]
     fn addr_underflow() {
-        _ = VirtualAddress::new(0) - 1;
+        _ = Address::new(0) - 1;
     }
 }

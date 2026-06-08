@@ -14,10 +14,10 @@ pub use {
         AddressTranslation, ENTRIES_PER_PAGE_TABLE, Level4PageTable, PAGE_TABLE_INDEX_WIDTH,
         PAGE_TABLE_OFFSET_WIDTH, PageRange, PageTable, PageTableEntry, PageTableFlags,
     },
-    physical_memory::{Frame, MAX_PHYSICAL_ADDR, PhysicalAddress},
+    physical_memory::{Frame, MAX_PHYSICAL_ADDR},
     virtual_memory::{
-        AddressDomain, MAX_VIRTUAL_ADDR, Page, VIRTUAL_MEMORY_OFFSET, VIRTUAL_MEMORY_SHIFT,
-        VirtualAddress, l4_constants::*,
+        Address, AddressDomain, MAX_VIRTUAL_ADDR, Page, VIRTUAL_MEMORY_OFFSET,
+        VIRTUAL_MEMORY_SHIFT, l4_constants::*,
     },
 };
 
