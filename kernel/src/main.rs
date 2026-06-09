@@ -8,7 +8,7 @@ extern crate alloc;
 
 mod acpi;
 mod apic;
-mod ata;
+// mod ata;
 mod gdt;
 mod idt;
 mod loader;
@@ -16,9 +16,15 @@ mod memory;
 mod scheduler;
 mod serial;
 mod tsc;
-mod vfat;
+// mod vfat;
 
-use {boot_info::BootInfo, core::arch::asm, log::info, memory_types::PAGE_SIZE};
+use {
+    alloc::{string::String, vec::Vec},
+    boot_info::{BootInfo, RootObjectMap},
+    core::arch::asm,
+    log::info,
+    memory_types::PAGE_SIZE,
+};
 
 
 // Linker offset symbols (see `../kernel_x86_64.ld`).
@@ -72,11 +78,14 @@ pub extern "sysv64" fn main(boot_info: &'static BootInfo) -> ! {
     tsc::init();
     memory::init(boot_info);
     acpi::init(boot_info);
-    ata::init(boot_info);
+    // ata::init(boot_info);
 
-    for object in boot_info.root_object_map.iter() {
-        log::debug!("OBJECT: {object:x?}");
-    }
+    loader::init(
+        boot_info,
+        InitFileSystem {
+            root_object_map: &boot_info.root_object_map,
+        },
+    );
 
     info!("STARTUP SUCCESSFUL");
 
@@ -119,5 +128,44 @@ impl KernelStack {
 
     const fn as_ptr(&self) -> *const u8 {
         self.0.as_ptr()
+    }
+}
+
+
+
+/// The initial in-memory file system (commonly called `initramfs`) provided to
+/// the kernel by the bootloader. It is a set of module objects loaded into
+/// memory.
+pub struct InitFileSystem {
+    root_object_map: &'static RootObjectMap,
+}
+
+impl fs::FileSystem for InitFileSystem {
+    fn list(&self, dir_path: &str) -> Result<Vec<String>, &'static str> {
+        Ok(self
+            .root_object_map
+            .iter()
+            .filter(|obj| {
+                obj.name_str()
+                    .starts_with(dir_path.strip_prefix("/").unwrap())
+            })
+            .map(|obj| format!("/{}.o", obj.name_str()))
+            .collect())
+    }
+
+    fn read(&mut self, path: &str) -> Result<Vec<u8>, &'static str> {
+        self.root_object_map
+            .iter()
+            .find(|obj| {
+                path.strip_prefix("/").unwrap().strip_suffix(".o").unwrap() == obj.name_str()
+            })
+            .map(|obj| {
+                let mut bytes = [0].repeat(obj.size);
+                bytes.clone_from_slice(unsafe {
+                    core::slice::from_raw_parts(obj.addr as *const u8, obj.size)
+                });
+                bytes
+            })
+            .ok_or("failed to read init object")
     }
 }
