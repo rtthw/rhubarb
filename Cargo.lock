@@ -248,7 +248,6 @@ name = "kernel"
 version = "0.1.0"
 dependencies = [
  "acpi",
- "ata",
  "bit-utils",
  "boot-info",
  "crossbeam-queue",

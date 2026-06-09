@@ -8,7 +8,6 @@ extern crate alloc;
 
 mod acpi;
 mod apic;
-// mod ata;
 mod gdt;
 mod idt;
 mod loader;
@@ -16,7 +15,6 @@ mod memory;
 mod scheduler;
 mod serial;
 mod tsc;
-// mod vfat;
 
 use {
     alloc::{string::String, vec::Vec},
@@ -78,7 +76,6 @@ pub extern "sysv64" fn main(boot_info: &'static BootInfo) -> ! {
     tsc::init();
     memory::init(boot_info);
     acpi::init(boot_info);
-    // ata::init(boot_info);
 
     loader::init(
         boot_info,
