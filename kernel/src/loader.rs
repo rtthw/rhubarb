@@ -23,7 +23,7 @@ use {
     fs::FileSystem,
     hashbrown::{HashMap, HashSet},
     log::{debug, error, info, trace},
-    memory_types::{Page, PageRange, PageTableFlags, Address},
+    memory_types::{Address, Page, PageRange, PageTableFlags},
     spin_mutex::Mutex,
 };
 
@@ -111,14 +111,6 @@ pub fn init(boot_info: &BootInfo, fs: impl FileSystem + 'static) {
         .load_object(
             "framebuffer",
             &AddressSpace::new("load_framebuffer", None),
-            // The actual value of this address doesn't matter.
-            Page::containing_addr(Address::new(0x3333_0000_0000)),
-        )
-        .unwrap();
-    global_loader()
-        .load_object(
-            "input",
-            &AddressSpace::new("load_input", None),
             // The actual value of this address doesn't matter.
             Page::containing_addr(Address::new(0x3333_0000_0000)),
         )
