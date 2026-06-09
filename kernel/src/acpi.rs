@@ -1,8 +1,8 @@
 //! # Advanced Configuration and Power Interface (ACPI)
 
 use {
-    crate::{apic, hpet},
-    acpi::{AcpiTables, platform::ProcessorState, sdt::hpet::HpetTable},
+    crate::apic,
+    acpi::{AcpiTables, platform::ProcessorState},
     boot_info::BootInfo,
     core::ptr::NonNull,
     log::{debug, info, warn},
@@ -38,11 +38,6 @@ pub fn init(boot_info: &BootInfo) {
                 }
             } else {
                 panic!("No FADT found");
-            }
-            if let Some(hpet) = tables.find_table::<HpetTable>() {
-                hpet::init(hpet.get().get_ref());
-            } else {
-                warn!("No HPET found");
             }
 
             let Ok(platform_info) = acpi::platform::AcpiPlatform::new(tables, AcpiHandler) else {

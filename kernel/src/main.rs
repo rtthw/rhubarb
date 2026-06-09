@@ -10,7 +10,6 @@ mod acpi;
 mod apic;
 mod ata;
 mod gdt;
-mod hpet;
 mod idt;
 mod loader;
 mod memory;
