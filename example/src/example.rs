@@ -3,9 +3,9 @@
 #![no_std]
 
 use {
-    core::{fmt::Write as _, sync::atomic::Ordering},
+    core::{alloc::Layout, fmt::Write as _, sync::atomic::Ordering},
     framebuffer::Color,
-    heap::{Allocator, string::ToString as _},
+    heap::{Allocator, alloc::alloc::alloc_zeroed, string::ToString as _},
     input::{GLOBAL_INPUT_QUEUE, InputEvent},
     math::{Area, Point, Size},
     spin_mutex::Mutex,
@@ -43,7 +43,7 @@ static SERIAL2: Mutex<uart_16550::Device> = Mutex::new(uart_16550::Device::COM2)
 
 pub extern "C" fn main() -> ! {
     unsafe {
-        ALLOCATOR.init(heap::BASE_ADDR, heap::DEFAULT_SIZE);
+        ALLOCATOR.init(heap::BASE_ADDR + 0x1000, heap::DEFAULT_SIZE);
     }
 
     unsafe { SERIAL2.lock().init() };
@@ -51,14 +51,15 @@ pub extern "C" fn main() -> ! {
 
     log::info!("Logging ready");
 
-    let string = "EXAMPLE".to_string();
-    if string.chars().nth(2) != Some('A') {
-        panic!("???")
-    }
+    {
+        let string = "EXAMPLE".to_string();
+        if string.chars().nth(2) != Some('A') {
+            panic!("???")
+        }
 
-    let phys_addr = process::translate_address(string.as_ptr().addr()).unwrap();
-    assert_ne!(string.as_ptr().addr(), phys_addr);
-    // assert_eq!(phys_addr, 0x232a000);
+        let phys_addr = process::translate_address(string.as_ptr().addr()).unwrap();
+        assert_ne!(string.as_ptr().addr(), phys_addr);
+    }
 
     if !time::monotonic_clock_ready() {
         panic!("CLOCK NOT READY");
@@ -67,11 +68,12 @@ pub extern "C" fn main() -> ! {
     let mut framebuffer = framebuffer::Framebuffer::global().unwrap();
     framebuffer.clear_screen(BG_COLOR);
 
-    let mouse_fb_size = POINTER_WIDTH * POINTER_HEIGHT * 4;
-    let mouse_fb_page_count = mouse_fb_size.div_ceil(4096);
-    let mouse_fb_addr = heap::BASE_ADDR + 4096;
-    let mut mouse_fb = framebuffer::Framebuffer::new(mouse_fb_addr, POINTER_WIDTH, POINTER_HEIGHT)
-        .to_color_buffer();
+    let mouse_fb_layout =
+        Layout::from_size_align(POINTER_WIDTH * POINTER_HEIGHT * 4, 4096).unwrap();
+    let mouse_fb_ptr = unsafe { alloc_zeroed(mouse_fb_layout) };
+    let mut mouse_fb =
+        framebuffer::Framebuffer::new(mouse_fb_ptr.addr(), POINTER_WIDTH, POINTER_HEIGHT)
+            .to_color_buffer();
     for y in 0..POINTER_HEIGHT {
         for x in 0..POINTER_WIDTH {
             let color = POINTER_IMAGE[x as usize][y as usize];
@@ -79,15 +81,15 @@ pub extern "C" fn main() -> ! {
         }
     }
 
-    let top_fb_page_count = framebuffer.size_in_bytes().div_ceil(4096);
-    let top_fb_addr = mouse_fb_addr + (mouse_fb_page_count * 4096);
-    let bottom_fb_addr = top_fb_addr + (top_fb_page_count * 4096);
+    let fb_layout = Layout::from_size_align(framebuffer.size_in_bytes(), 4096).unwrap();
+    let top_fb_ptr = unsafe { alloc_zeroed(fb_layout) };
+    let bottom_fb_ptr = unsafe { alloc_zeroed(fb_layout) };
 
     let mut top_fb = framebuffer
-        .with_new_addr(top_fb_addr as usize)
+        .with_new_addr(top_fb_ptr.addr())
         .to_color_buffer();
     let mut bottom_fb = framebuffer
-        .with_new_addr(bottom_fb_addr as usize)
+        .with_new_addr(bottom_fb_ptr.addr())
         .to_color_buffer();
 
     // HACK: We draw the bottom right pixel before doing anything with the
