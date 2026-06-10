@@ -339,7 +339,7 @@ extern "x86-interrupt" fn page_fault_handler(
 
 extern "x86-interrupt" fn general_protection_fault_handler(
     stack_frame: InterruptStackFrame,
-    error_code: u64,
+    _error_code: u64,
 ) {
     let addr_space_frame = Cr3::read_raw().0;
     let ins_ptr = stack_frame.instruction_pointer.as_ptr::<u8>();
@@ -356,13 +356,13 @@ extern "x86-interrupt" fn general_protection_fault_handler(
         );
         scheduler::exit(-2);
     } else {
+        let instruction_addr = Address::new(stack_frame.instruction_pointer.as_u64() as _);
+        let instruction_section = global_loader()
+            .get_section_for_addr(instruction_addr)
+            .and_then(|section| section.upgrade());
         panic!(
-            "#GP at `{opcode:x}` in {addr_space_frame:?}{} : {stack_frame:#?}",
-            if error_code != 0 {
-                format!(" for SEGMENT {error_code}")
-            } else {
-                format!("")
-            },
+            "#GP at `{opcode:x}` in {addr_space_frame:?} while executing \
+            `{instruction_section:?}` at {instruction_addr:x} : {stack_frame:#?}"
         );
     }
 }
