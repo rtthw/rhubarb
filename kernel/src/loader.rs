@@ -267,7 +267,7 @@ pub struct LoadedObject {
     /// The demangled name of this object.
     pub name: Arc<str>,
     /// The sections that have been loaded into memory for this object.
-    pub sections: HashMap<usize, Arc<LoadedSection>>,
+    pub sections: HashMap<usize, Arc<LoadedSection>, rustc_hash::FxBuildHasher>,
     /// A set of section indices representing the global sections of this
     /// object. They can be used as keys for [`self.sections`](Self::sections).
     pub global_sections: BTreeSet<usize>,
@@ -279,7 +279,7 @@ pub struct LoadedObject {
     /// [`self.sections`](Self::sections).
     pub tls_sections: BTreeSet<usize>,
     /// Sections this object depends on.
-    pub dependencies: HashSet<Dependency>,
+    pub dependencies: HashSet<Dependency, rustc_hash::FxBuildHasher>,
     pub executable_mapping: Option<Arc<Mutex<KernelMapping>>>,
     pub read_only_mapping: Option<Arc<Mutex<KernelMapping>>>,
     pub read_write_mapping: Option<Arc<Mutex<KernelMapping>>>,
@@ -726,17 +726,18 @@ impl Loader {
 
         let object = Arc::new(Mutex::new(LoadedObject {
             name: rustc_demangle::demangle(object_name).to_string().into(),
-            sections: HashMap::new(),
+            sections: HashMap::with_hasher(rustc_hash::FxBuildHasher),
             global_sections: BTreeSet::new(),
             data_sections: BTreeSet::new(),
             tls_sections: BTreeSet::new(),
-            dependencies: HashSet::new(),
+            dependencies: HashSet::with_hasher(rustc_hash::FxBuildHasher),
             executable_mapping: executable_mapping.clone(),
             read_only_mapping: read_only_mapping.clone(),
             read_write_mapping: read_write_mapping.clone(),
         }));
 
-        let mut loaded_sections: HashMap<usize, Arc<LoadedSection>> = HashMap::new();
+        let mut loaded_sections: HashMap<usize, Arc<LoadedSection>, rustc_hash::FxBuildHasher> =
+            HashMap::with_hasher(rustc_hash::FxBuildHasher);
         let mut data_sections: BTreeSet<usize> = BTreeSet::new();
         let mut tls_sections: BTreeSet<usize> = BTreeSet::new();
         let global_sections: BTreeSet<usize> = {
