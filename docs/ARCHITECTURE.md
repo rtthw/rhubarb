@@ -25,17 +25,27 @@ The [/drivers](../drivers) directory contains device drivers used by the kernel.
   - [/defer-mutex](../crates/defer-mutex) ✔️
   - [/elf](../crates/elf) ✔️
   - [/framebuffer](../crates/framebuffer) ✔️
+  - [/fs](../crates/fs) ✔️
+  - [/heap](../crates/heap) ✔️
   - [/input](../crates/input) ✔️
+  - [/io](../crates/io) ✔️
   - [/log](../crates/log) ✔️
   - [/math](../crates/math) ✔️
   - [/memory-types](../crates/memory-types) ✔️
+  - [/panic](../crates/panic) ✔️
   - [/pod](../crates/pod) ✔️
+  - [/process](../crates/process) ✔️
   - [/spin-mutex](../crates/spin-mutex) ✔️
   - [/time](../crates/time) ✔️
 - [/drivers](../drivers)
+  - [/ata](../drivers/ata) ✔️
   - [/pci](../drivers/pci) ✔️
   - [/pit](../drivers/pit) ✔️
+  - [/rtc](../drivers/rtc) ✔️
+  - [/uart-16550](../drivers/uart-16550) ✔️
   - [/virtio](../drivers/virtio) ✔️
   - [/x86-port](../drivers/x86-port) ✔️
 - [/example](../example) ✔️
+  - [/apps](../example/apps)
+    - [/input-driver](../example/apps/input-driver) ✔️
 - [/kernel](../kernel) ✔️
