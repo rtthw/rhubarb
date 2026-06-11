@@ -7,3 +7,4 @@ blank_lines_upper_bound = 7
 imports_granularity = "One"
 
 wrap_comments = true
+comment_width = 100

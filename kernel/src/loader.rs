@@ -605,8 +605,8 @@ impl Loader {
     ///
     /// - `object_name`, the name of the object to be loaded.
     /// - `address_space`, the [`AddressSpace`] to load the object into.
-    /// - `start_page`, the starting page within `address_space` at which the
-    ///   object (and its dependencies) will be loaded.
+    /// - `start_page`, the starting page within `address_space` at which the object (and its
+    ///   dependencies) will be loaded.
     pub fn load_object(
         &self,
         object_name: &str,

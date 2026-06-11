@@ -295,8 +295,7 @@ impl KernelMapping {
     ///
     /// ## Arguments
     ///
-    /// - `address_space`, the [`AddressSpace`] that will receive the newly
-    ///   mapped pages.
+    /// - `address_space`, the [`AddressSpace`] that will receive the newly mapped pages.
     /// - `pages`, the pages to map within `address_space`.
     /// - `flags`, the [`PageTableFlags`] to apply to the new mapping.
     pub fn map_into(

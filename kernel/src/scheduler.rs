@@ -18,7 +18,7 @@ use {
         sync::atomic::{AtomicU64, Ordering},
     },
     log::{debug, info, warn},
-    memory_types::{AddressDomain, PAGE_SIZE, PageRange, PageTableFlags, Address},
+    memory_types::{Address, AddressDomain, PAGE_SIZE, PageRange, PageTableFlags},
     spin_mutex::Mutex,
     x86_64::{
         instructions::interrupts::without_interrupts, registers::rflags::RFlags,
@@ -215,10 +215,10 @@ impl Scheduler {
     /// ## Arguments
     ///
     /// - `name`, the name of the process to be run.
-    /// - `entry_point`, a pointer to the entry point of the process. The
-    ///   function must be diverging.
-    /// - `stack_size`, a size for the new process's stack. If `None` is
-    ///   provided, the [`DEFAULT_KERNEL_STACK_SIZE`] will be used.
+    /// - `entry_point`, a pointer to the entry point of the process. The function must be
+    ///   diverging.
+    /// - `stack_size`, a size for the new process's stack. If `None` is provided, the
+    ///   [`DEFAULT_KERNEL_STACK_SIZE`] will be used.
     #[allow(unused)]
     pub fn run_kernel_process(
         &mut self,
@@ -273,10 +273,9 @@ impl Scheduler {
     /// ## Arguments
     ///
     /// - `name`, the name of the process to be run.
-    /// - `stack_size`, a size for the new process's stack. If `None` is
-    ///   provided, the [`DEFAULT_USER_STACK_SIZE`] will be used.
-    /// - `allow_io`, whether the new process will be allowed to perform I/O
-    ///   instructions.
+    /// - `stack_size`, a size for the new process's stack. If `None` is provided, the
+    ///   [`DEFAULT_USER_STACK_SIZE`] will be used.
+    /// - `allow_io`, whether the new process will be allowed to perform I/O instructions.
     pub fn run_user_process(
         &mut self,
         name: impl Into<String>,
