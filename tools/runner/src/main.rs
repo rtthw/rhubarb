@@ -27,7 +27,7 @@ const OBJECT_SOURCES: &[(&str, &str)] = &[
     ("", "example"),
     ("example/apps", "input-driver"),
 ];
-const LANG_DEPS: &[&str] = &["core", "alloc", "compiler_builtins"];
+const EXTERNAL_DEPS: &[&str] = &["core", "alloc", "compiler_builtins", "hashbrown"];
 
 fn main() -> Result<()> {
     let workspace_dir = find_workspace_dir()?;
@@ -84,14 +84,15 @@ fn main() -> Result<()> {
         }
     }
 
-    // Create object files for the core language dependencies.
-    for name in LANG_DEPS {
+    // Create object files for external dependencies.
+    let external_deps_dir = workspace_dir.join("target/x86_64-app/release/deps");
+    for name in EXTERNAL_DEPS {
         let extraction_path = extraction_dir.join(name);
         if extraction_path.exists() {
             continue;
         }
         create_dir_all(&extraction_path)?;
-        let rlib_path = find_rlib(&workspace_dir.join("target/x86_64-app/release/deps"), name)?;
+        let rlib_path = find_rlib(&external_deps_dir, name)?;
 
         println!(
             "Extracting `{}` to `{}`...",

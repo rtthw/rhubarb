@@ -150,8 +150,12 @@ pub extern "C" fn main() -> ! {
         &mut framebuffer,
     );
 
+    // let mut seen_events = hashbrown::HashSet::with_hasher(rustc_hash::FxBuildHasher);
     'main_loop: loop {
         for event in GLOBAL_INPUT_QUEUE.lock().drain() {
+            // if seen_events.insert(event) {
+            //     log::info!("New input event: {event:?}");
+            // }
             let render = match event {
                 InputEvent::KeyPress { code } => {
                     if code == 16 {

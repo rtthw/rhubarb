@@ -11,7 +11,7 @@ const QUEUE_SIZE: usize = 64;
 pub static GLOBAL_INPUT_QUEUE: Mutex<InputQueue> = Mutex::new(InputQueue::new());
 
 /// A user input event.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum InputEvent {
     /// The user pressed a key.
     KeyPress { code: u16 },
