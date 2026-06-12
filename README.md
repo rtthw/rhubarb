@@ -24,7 +24,13 @@ See the [design document](./docs/DESIGN.md) for an overview of the system.
 
 ## Quick Start
 
-Execute the [runner tool](./tools/runner) to build and run Rhubarb through QEMU.
+Execute the [runner tool](./tools/runner) to build and run Rhubarb through QEMU. You will need `git`, `cargo`, `rustc`, `ld`, `ar`, and `qemu-system-x86_64` available on the host system.
+
+```sh
+git clone https://github.com/rtthw/rhubarb
+cd rhubarb/tools/runner
+cargo run
+```
 
 ## Learn More
 
