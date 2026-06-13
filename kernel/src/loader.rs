@@ -23,7 +23,7 @@ use {
     fs::FileSystem,
     hashbrown::{HashMap, HashSet},
     log::{debug, error, info, trace},
-    memory_types::{Address, Page, PageRange, PageTableFlags},
+    memory_types::{Address, Page, PageRange, PageTableFlags, USER_HEAP_L4_INDEX},
     spin_mutex::Mutex,
 };
 
@@ -83,7 +83,7 @@ pub fn init(boot_info: &BootInfo, fs: impl FileSystem + 'static) {
             "math",
             &AddressSpace::new("load_math", None),
             // The actual value of this address doesn't matter.
-            Page::containing_addr(Address::new(0x3333_0000_0000)),
+            Address::from_table_indices(USER_HEAP_L4_INDEX, 0, 0, 0).page(),
         )
         .unwrap();
     for name in ["__ltsf2", "__lesf2"] {
@@ -104,7 +104,7 @@ pub fn init(boot_info: &BootInfo, fs: impl FileSystem + 'static) {
             "time",
             &AddressSpace::new("load_time", None),
             // The actual value of this address doesn't matter.
-            Page::containing_addr(Address::new(0x3333_0000_0000)),
+            Address::from_table_indices(USER_HEAP_L4_INDEX, 0, 0, 0).page(),
         )
         .unwrap();
     global_loader()
@@ -112,7 +112,7 @@ pub fn init(boot_info: &BootInfo, fs: impl FileSystem + 'static) {
             "framebuffer",
             &AddressSpace::new("load_framebuffer", None),
             // The actual value of this address doesn't matter.
-            Page::containing_addr(Address::new(0x3333_0000_0000)),
+            Address::from_table_indices(USER_HEAP_L4_INDEX, 0, 0, 0).page(),
         )
         .unwrap();
     global_loader()
@@ -120,7 +120,7 @@ pub fn init(boot_info: &BootInfo, fs: impl FileSystem + 'static) {
             "heap",
             &AddressSpace::new("load_heap", None),
             // The actual value of this address doesn't matter.
-            Page::containing_addr(Address::new(0x3333_0000_0000)),
+            Address::from_table_indices(USER_HEAP_L4_INDEX, 0, 0, 0).page(),
         )
         .unwrap();
 
@@ -184,7 +184,7 @@ fn init_fundamental_symbols() {
             "panic",
             &AddressSpace::new("load_panic", None),
             // The actual value of this address doesn't matter.
-            Page::containing_addr(Address::new(0x3333_0000_0000)),
+            Address::from_table_indices(USER_HEAP_L4_INDEX, 0, 0, 0).page(),
         )
         .unwrap();
     let object = global_loader()
@@ -192,7 +192,7 @@ fn init_fundamental_symbols() {
             "lang",
             &AddressSpace::new("load_fundamental", None),
             // The actual value of this address doesn't matter.
-            Page::containing_addr(Address::new(0x2222_0000_0000)),
+            Address::from_table_indices(USER_HEAP_L4_INDEX, 0, 0, 0).page(),
         )
         .unwrap();
     let object_lock = object.lock();
@@ -605,8 +605,8 @@ impl Loader {
     ///
     /// - `object_name`, the name of the object to be loaded.
     /// - `address_space`, the [`AddressSpace`] to load the object into.
-    /// - `start_page`, the starting page within `address_space` at which the object (and its
-    ///   dependencies) will be loaded.
+    /// - `start_page`, the starting page within `address_space` at which the object (and
+    ///   its dependencies) will be loaded.
     pub fn load_object(
         &self,
         object_name: &str,
