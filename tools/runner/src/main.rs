@@ -24,8 +24,8 @@ const OBJECT_SOURCES: &[(&str, &str)] = &[
     ("drivers", "pit"),
     ("drivers", "uart-16550"),
     ("drivers", "virtio"),
-    ("", "example"),
-    ("example/apps", "input-driver"),
+    ("", "shell"),
+    ("shell/apps", "input-driver"),
 ];
 const EXTERNAL_DEPS: &[&str] = &["core", "alloc", "compiler_builtins", "hashbrown"];
 

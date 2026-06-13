@@ -86,9 +86,9 @@ pub extern "sysv64" fn main(boot_info: &'static BootInfo) -> ! {
 
     info!("STARTUP SUCCESSFUL");
 
-    // Run the example programs.
+    // Start the shell.
     scheduler::with_scheduler(|scheduler| {
-        scheduler.run_user_process("example", None, true, scheduler::AccessPolicy::All);
+        scheduler.run_user_process("shell", None, true, scheduler::AccessPolicy::All);
     });
     scheduler::with_scheduler(|scheduler| {
         scheduler.run_user_process("input_driver", None, true, scheduler::AccessPolicy::All);

@@ -1,10 +1,10 @@
 [package]
-name = "example"
+name = "shell"
 version.workspace = true
 edition.workspace = true
 
 [lib]
-path = "src/example.rs"
+path = "src/shell.rs"
 
 [dependencies]
 framebuffer = { path = "../crates/framebuffer" }

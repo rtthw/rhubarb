@@ -4,9 +4,9 @@ members = [
     "bootloader",
     "crates/*",
     "drivers/*",
-    "example",
-    "example/apps/*",
     "kernel",
+    "shell",
+    "shell/apps/*",
     "tools/runner",
 ]
 

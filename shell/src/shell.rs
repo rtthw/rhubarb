@@ -1,12 +1,12 @@
-//! # Example Program
+//! # Shell
 
 #![no_std]
 
 use {
     core::{alloc::Layout, fmt::Write as _, sync::atomic::Ordering},
     framebuffer::Color,
-    heap::{Allocator, alloc::alloc::alloc_zeroed, string::ToString as _},
-    input::{GLOBAL_INPUT_QUEUE, InputEvent},
+    heap::{alloc::alloc::alloc_zeroed, string::ToString as _, Allocator},
+    input::{InputEvent, GLOBAL_INPUT_QUEUE},
     math::{Area, Point, Size},
     spin_mutex::Mutex,
 };
