@@ -3,7 +3,10 @@
 //! Types and functions used to dynamically load (and link) programs.
 
 use {
-    crate::memory::{AddressSpace, KernelMapping},
+    crate::{
+        InitFileSystem,
+        memory::{AddressSpace, KernelMapping},
+    },
     alloc::{
         boxed::Box,
         collections::{btree_map::BTreeMap, btree_set::BTreeSet},
@@ -67,10 +70,12 @@ static LOADER: Loader = Loader::new();
 static mut PROVIDER: Option<GlobalObjectProvider> = None;
 
 /// Initialize the [global loader](global_loader).
-pub fn init(boot_info: &BootInfo, fs: impl FileSystem + 'static) {
+pub fn init(boot_info: &'static BootInfo) {
     unsafe {
         PROVIDER = Some(GlobalObjectProvider {
-            fs: Mutex::new(Box::new(fs)),
+            fs: Mutex::new(Box::new(InitFileSystem {
+                root_object_map: &boot_info.root_object_map,
+            })),
         });
     }
 

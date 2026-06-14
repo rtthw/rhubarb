@@ -76,13 +76,7 @@ pub extern "sysv64" fn main(boot_info: &'static BootInfo) -> ! {
     tsc::init();
     memory::init(boot_info);
     acpi::init(boot_info);
-
-    loader::init(
-        boot_info,
-        InitFileSystem {
-            root_object_map: &boot_info.root_object_map,
-        },
-    );
+    loader::init(boot_info);
 
     info!("STARTUP SUCCESSFUL");
 
