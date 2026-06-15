@@ -367,15 +367,21 @@ impl ColorBuffer {
 }
 
 pub fn composite<'a>(
+    damage: Option<Area>,
     sources: impl IntoIterator<Item = (&'a mut ColorBuffer, Point)>,
     target: &mut Framebuffer,
 ) {
     for (source, point_in_target) in sources.into_iter() {
-        composite_buffer(source, target, point_in_target);
+        composite_buffer(damage, source, target, point_in_target);
     }
 }
 
-fn composite_buffer(source: &ColorBuffer, target: &mut Framebuffer, target_point: Point) {
+fn composite_buffer(
+    damage: Option<Area>,
+    source: &ColorBuffer,
+    target: &mut Framebuffer,
+    target_point: Point,
+) {
     let target_size = target.size();
     let source_size = source.size();
 
@@ -394,8 +400,17 @@ fn composite_buffer(source: &ColorBuffer, target: &mut Framebuffer, target_point
         return;
     }
 
-    let source_start = target_start - target_point;
-    let source_end = target_end - target_point;
+    let mut source_start = target_start - target_point;
+    let mut source_end = target_end - target_point;
+    if let Some(damage) = damage {
+        if !source.area().with_pos(target_point).intersects(&damage) {
+            return;
+        }
+        if source_size.width > damage.width() && source_size.height > damage.height() {
+            source_start = source_start.max(damage.position());
+            source_end = source_end.min(damage.position() + damage.size());
+        }
+    }
     if source_end.x < 0.0
         || source_end.y < 0.0
         || source_start.x > source_size.width

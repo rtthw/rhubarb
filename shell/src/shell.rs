@@ -5,8 +5,8 @@
 use {
     core::{alloc::Layout, fmt::Write as _, sync::atomic::Ordering},
     framebuffer::Color,
-    heap::{alloc::alloc::alloc_zeroed, string::ToString as _, Allocator},
-    input::{InputEvent, GLOBAL_INPUT_QUEUE},
+    heap::{Allocator, alloc::alloc::alloc_zeroed, string::ToString as _},
+    input::{GLOBAL_INPUT_QUEUE, InputEvent},
     math::{Area, Point, Size},
     spin_mutex::Mutex,
 };
@@ -142,6 +142,7 @@ pub extern "C" fn main() -> ! {
     };
 
     framebuffer::composite(
+        None,
         [
             (&mut bottom_fb, Point::ORIGIN),
             (&mut top_fb, Point::ORIGIN),
@@ -156,30 +157,41 @@ pub extern "C" fn main() -> ! {
             // if seen_events.insert(event) {
             //     log::info!("New input event: {event:?}");
             // }
-            let render = match event {
+            let damage = match event {
                 InputEvent::KeyPress { code } => {
                     if code == 16 {
                         break 'main_loop;
                     }
-                    false
+                    Some(Area::from_size(framebuffer.size()))
                 }
                 InputEvent::MouseMove { delta_x, delta_y } => {
+                    let x_delta = delta_x as f32;
+                    let y_delta = delta_y as f32;
+
+                    let old_mouse_pos = input_state.mouse_pos;
                     input_state.mouse_pos = Point::new(
                         (display_width - 1.0)
-                            .min(input_state.mouse_pos.x + delta_x as f32)
+                            .min(input_state.mouse_pos.x + x_delta)
                             .max(0.0),
                         (display_height - 1.0)
-                            .min(input_state.mouse_pos.y + delta_y as f32)
+                            .min(input_state.mouse_pos.y + y_delta)
                             .max(0.0),
                     );
 
-                    true
+                    Some(Area::new(
+                        old_mouse_pos,
+                        Size::new(
+                            POINTER_WIDTH as f32 + x_delta.abs(),
+                            POINTER_HEIGHT as f32 + y_delta.abs(),
+                        ),
+                    ))
                 }
-                _ => false,
+                _ => None,
             };
 
-            if render {
+            if let Some(damage) = damage {
                 framebuffer::composite(
+                    Some(damage),
                     [
                         (&mut bottom_fb, Point::ORIGIN),
                         (&mut top_fb, Point::ORIGIN),
