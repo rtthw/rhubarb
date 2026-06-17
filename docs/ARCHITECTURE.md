@@ -1,16 +1,15 @@
 
-
-
 # Architecture
 
-Rhubarb consists of 2 major components:
+Rhubarb consists of 3 major components:
 
-- Bare metal operating system kernel (in [/kernel](../kernel), with a simple example program in [/example](../example)).
+- Bare metal operating system kernel (in [/kernel](../kernel).
+- A shell implementation in [/shell](../shell)), with applications in [/shell/apps](../shell/apps).
 - UEFI Bootloader (in [/bootloader](../bootloader)).
 
 The [/crates](../crates) directory contains various crates (e.g. [`boot-info`](../crates/boot-info)) used by one or more of the major components.
 
-The [/drivers](../drivers) directory contains device drivers used by the kernel.
+The [/drivers](../drivers) directory contains device drivers used by both the kernel and userspace applications.
 
 ## Current State
 
@@ -43,7 +42,7 @@ The [/drivers](../drivers) directory contains device drivers used by the kernel.
   - [/uart-16550](../drivers/uart-16550) ✔️
   - [/virtio](../drivers/virtio) ✔️
   - [/x86-port](../drivers/x86-port) ✔️
-- [/example](../example) ✔️
-  - [/apps](../example/apps)
-    - [/input-driver](../example/apps/input-driver) ✔️
+- [/shell](../shell) ✔️
+  - [/apps](../shell/apps)
+    - [/input-driver](../shell/apps/input-driver) ✔️
 - [/kernel](../kernel) ✔️
