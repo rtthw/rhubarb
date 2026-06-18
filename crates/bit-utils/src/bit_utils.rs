@@ -75,11 +75,37 @@ macro_rules! bit_flags {
             }
         }
 
+        impl ::core::ops::BitOrAssign for $ident {
+            fn bitor_assign(&mut self, rhs: Self) {
+                *self = Self(self.0 | rhs.0)
+            }
+        }
+
         impl ::core::ops::BitAnd for $ident {
             type Output = Self;
 
             fn bitand(self, rhs: Self) -> Self::Output {
                 Self(self.0 & rhs.0)
+            }
+        }
+
+        impl ::core::ops::BitAndAssign for $ident {
+            fn bitand_assign(&mut self, rhs: Self) {
+                *self = Self(self.0 & rhs.0)
+            }
+        }
+
+        impl ::core::ops::BitXor for $ident {
+            type Output = Self;
+
+            fn bitxor(self, rhs: Self) -> Self::Output {
+                Self(self.0 ^ rhs.0)
+            }
+        }
+
+        impl ::core::ops::BitXorAssign for $ident {
+            fn bitxor_assign(&mut self, rhs: Self) {
+                *self = Self(self.0 ^ rhs.0)
             }
         }
     };
