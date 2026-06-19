@@ -46,12 +46,18 @@ macro_rules! bit_flags {
         impl ::core::fmt::Debug for $ident {
             fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
                 if self == &Self::NONE {
-                    return write!(f, concat!(stringify!($ident), "NONE"));
+                    return write!(f, "NONE");
                 }
 
+                let mut first = true;
                 $(
                     if *self & Self::$flag_ident != Self::NONE {
-                        write!(f, concat!(stringify!($flag_ident), "| "))?;
+                        if first {
+                            write!(f, stringify!($flag_ident))?;
+                            first = false;
+                        } else {
+                            write!(f, concat!(" | ", stringify!($flag_ident)))?;
+                        }
                     }
                 )*
 
