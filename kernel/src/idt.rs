@@ -5,10 +5,11 @@ use {
         apic, gdt,
         loader::global_loader,
         memory::{FRAMEBUFFER_MAPPING, KernelMapping, kernel_address_space},
-        scheduler::{self, AccessPolicy, with_scheduler},
+        scheduler::{self, with_scheduler},
     },
     log::{error, info, warn},
     memory_types::{Address, AddressDomain, GIBIBYTE, PAGE_SIZE, Page, PageRange, PageTableFlags},
+    process::AccessPolicy,
     x86_64::{
         registers::control::{Cr2, Cr3},
         set_general_handler,

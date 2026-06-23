@@ -206,6 +206,7 @@ dependencies = [
  "memory-types",
  "pci",
  "pit",
+ "process",
  "rtc",
  "rustc-demangle",
  "rustc-hash",

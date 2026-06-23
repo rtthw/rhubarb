@@ -19,6 +19,7 @@ math = { path = "../crates/math" }
 memory-types = { path = "../crates/memory-types" }
 pci = { path = "../drivers/pci" }
 pit = { path = "../drivers/pit" }
+process = { path = "../crates/process" }
 rtc = { path = "../drivers/rtc" }
 rustc-demangle = "0.1.27"
 rustc-hash = { version = "2.1.2", default-features = false }

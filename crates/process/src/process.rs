@@ -65,3 +65,33 @@ impl core::fmt::Display for TranslateAddressError {
         )
     }
 }
+
+/// The policy used to determine how resources are granted to a process.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(u8)]
+pub enum AccessPolicy {
+    /// The process has access to all resources.
+    ///
+    /// No checks are performed when it requests access to a resource. The
+    /// resource is granted without blocking the process.
+    All,
+    /// The process has normal access to resources.
+    ///
+    /// When it requests access to some resource, it will be blocked until
+    /// access is granted (or stopped if it is denied).
+    #[default]
+    Normal,
+    // /// The process has no access to resources.
+    // ///
+    // /// If it requests access to a resource, the process will be stopped.
+    // None,
+}
+
+/// The execution priority of a process.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(u8)]
+pub enum Priority {
+    None = 0,
+    Normal = 32,
+    Idle = 255,
+}
