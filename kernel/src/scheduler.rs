@@ -5,12 +5,13 @@
 use {
     crate::{
         KERNEL_STACK, KERNEL_STACK_SIZE, gdt,
-        loader::global_loader,
+        loader::{LoadedObject, global_loader},
         memory::{AddressSpace, KernelMapping, kernel_address_space},
     },
     alloc::{
         collections::{btree_map::BTreeMap, vec_deque::VecDeque},
         string::String,
+        sync::Arc,
     },
     core::{
         arch::asm,
@@ -160,18 +161,15 @@ impl Scheduler {
             .push_back(process);
     }
 
-    fn next_ready(&mut self) -> Process {
-        self.queue
-            .values_mut()
-            .find(|q| !q.is_empty())
-            .expect("should at least have an idle process available")
-            .pop_front()
-            .unwrap()
-    }
-
     fn schedule_next(&mut self) -> ExecutionContext {
         if self.current.is_none() {
-            let process = self.next_ready();
+            let process = self
+                .queue
+                .values_mut()
+                .find(|q| !q.is_empty())
+                .expect("should at least have an idle process available")
+                .pop_front()
+                .unwrap();
             process.address_space.enter();
             crate::gdt::set_user_io_allowed(process.allow_io);
             self.current = Some(process);
@@ -279,14 +277,14 @@ impl Scheduler {
         stack_size: Option<usize>,
         allow_io: bool,
         access_policy: AccessPolicy,
-    ) {
+    ) -> Arc<Mutex<LoadedObject>> {
         let id = PROCESS_ID.fetch_add(1, Ordering::SeqCst);
         let name = name.into();
 
         let address_space = AddressSpace::new(format!("{name}.{id}"), None);
         let user_code_addr = AddressDomain::UserCode.base_addr();
 
-        let _object = global_loader()
+        let object = global_loader()
             .load_object(&name, &address_space, user_code_addr.page())
             .unwrap();
 
@@ -333,6 +331,8 @@ impl Scheduler {
         info!("Running {process}");
 
         self.add_to_queue(process);
+
+        object
     }
 }
 
