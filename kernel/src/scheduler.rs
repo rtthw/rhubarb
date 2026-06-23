@@ -17,7 +17,7 @@ use {
         fmt,
         sync::atomic::{AtomicU64, Ordering},
     },
-    log::{debug, info, warn},
+    log::{debug, info},
     memory_types::{Address, AddressDomain, PAGE_SIZE, PageRange, PageTableFlags},
     process::{AccessPolicy, Priority},
     spin_mutex::Mutex,
@@ -200,15 +200,11 @@ impl Scheduler {
     /// Preempt the currently running process, and place it at the end of the
     /// run queue.
     pub fn preempt_current(&mut self) {
-        if self.queue.is_empty() {
-            warn!("Attempted preemption with an empty ready queue");
-        } else {
-            let process = self
-                .current
-                .take()
-                .expect("current process should be available for preemption");
-            self.add_to_queue(process);
-        }
+        let process = self
+            .current
+            .take()
+            .expect("current process should be available for preemption");
+        self.add_to_queue(process);
     }
 
     /// Add a kernel process with the given parameters to the run queue.
