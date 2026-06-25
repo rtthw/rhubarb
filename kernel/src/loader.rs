@@ -508,7 +508,7 @@ impl Loader {
         // HACK: For some reason, the `<usize as core::fmt:Display>::fmt` symbol fails
         //       to load. I think it's some weird edge case with object section loading.
         if name == "<usize as core::fmt::Display>::fmt" {
-            let ref_name = "<&usize as core::fmt::Display>::fmt";
+            let ref_name = "<u64 as core::fmt::Display>::fmt";
             trace!("Adding alias `{name}` to `{ref_name}`");
             let Some(section) = self.sections.lock().get(&*ref_name).cloned() else {
                 unreachable!();
