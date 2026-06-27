@@ -5,7 +5,7 @@ use {
         apic, gdt,
         loader::global_loader,
         memory::{FRAMEBUFFER_MAPPING, KernelMapping, kernel_address_space},
-        scheduler::{self, with_scheduler},
+        scheduler::{self, CpuRegisters, ExecutionContext, with_scheduler},
     },
     log::{error, info, warn},
     memory_types::{Address, AddressDomain, GIBIBYTE, PAGE_SIZE, Page, PageRange, PageTableFlags},
@@ -73,18 +73,93 @@ extern "x86-interrupt" fn double_fault_handler(
     panic!("#DF({error_code}) at `{opcode:x}` in {addr_space_frame:?} : {stack_frame:#?}");
 }
 
+#[unsafe(naked)]
 extern "x86-interrupt" fn page_fault_handler(
     stack_frame: InterruptStackFrame,
     error_code: PageFaultErrorCode,
 ) {
+    core::arch::naked_asm!(
+        "push rax",
+        "push rbx",
+        "push rcx",
+        "push rdx",
+        "push rbp",
+        "push rdi",
+        "push rsi",
+        "push r8",
+        "push r9",
+        "push r10",
+        "push r11",
+        "push r12",
+        "push r13",
+        "push r14",
+        "push r15",
+
+        "mov rdi, rsp",
+        "call {}",
+
+        // NOTE: This would be necessary if `__page_fault_handler` didn't unconditionally
+        //       call `scheduler::schedule`.
+
+        // "pop r15",
+        // "pop r14",
+        // "pop r13",
+        // "pop r12",
+        // "pop r11",
+        // "pop r10",
+        // "pop r9",
+        // "pop r8",
+        // "pop rsi",
+        // "pop rdi",
+        // "pop rbp",
+        // "pop rdx",
+        // "pop rcx",
+        // "pop rbx",
+        // "pop rax",
+        // "iretq",
+
+        sym __page_fault_handler
+    );
+}
+
+#[repr(C)]
+struct PageFaultContext {
+    registers: CpuRegisters,
+    error_code: PageFaultErrorCode,
+    rip: Address,
+    cs: u64,
+    rflags: x86_64::registers::rflags::RFlags,
+    rsp: Address,
+    ss: u64,
+}
+
+extern "C" fn __page_fault_handler(context: PageFaultContext) -> ! {
+    with_scheduler(|scheduler| {
+        scheduler.set_current_context(ExecutionContext {
+            registers: context.registers,
+            frame: x86_64::structures::idt::InterruptStackFrameValue::new(
+                x86_64::VirtAddr::new(context.rip.to_raw() as _),
+                x86_64::structures::gdt::SegmentSelector(context.cs as _),
+                context.rflags,
+                x86_64::VirtAddr::new(context.rsp.to_raw() as _),
+                x86_64::structures::gdt::SegmentSelector(context.ss as _),
+            ),
+        });
+    });
+
     let addr = Address::new(Cr2::read_raw() as usize);
     let addr_space_frame = Cr3::read_raw().0;
 
-    let user_mode = error_code.contains(PageFaultErrorCode::USER_MODE);
-    let caused_by_write = error_code.contains(PageFaultErrorCode::CAUSED_BY_WRITE);
+    let user_mode = context.error_code.contains(PageFaultErrorCode::USER_MODE);
+    let caused_by_write = context
+        .error_code
+        .contains(PageFaultErrorCode::CAUSED_BY_WRITE);
 
     if !user_mode {
-        panic!("#PF({error_code:?}) at {addr:#x} in {addr_space_frame:?} : {stack_frame:#?}");
+        panic!(
+            "#PF({:?}) at {addr:#x} in {addr_space_frame:?}",
+            context.error_code,
+        );
     }
 
     let domain = addr.domain();
@@ -100,7 +175,6 @@ extern "x86-interrupt" fn page_fault_handler(
             );
         });
         scheduler::exit(-17);
-        return;
     }
 
     if domain == AddressDomain::UserHeap {
@@ -172,7 +246,7 @@ extern "x86-interrupt" fn page_fault_handler(
             scheduler::exit(-7);
         }
 
-        return;
+        scheduler::schedule();
     }
 
     let Some(section) = global_loader()
@@ -260,8 +334,7 @@ extern "x86-interrupt" fn page_fault_handler(
                         );
                     }
                 } else {
-                    let instruction_addr =
-                        Address::new(stack_frame.instruction_pointer.as_u64() as _);
+                    let instruction_addr = context.rip;
                     let instruction_section = global_loader()
                         .get_section_for_addr(instruction_addr)
                         .and_then(|section| section.upgrade());
@@ -280,7 +353,7 @@ extern "x86-interrupt" fn page_fault_handler(
             scheduler::exit(-2);
         }
 
-        return;
+        scheduler::schedule();
     };
 
     let mut exit_process = false;
@@ -336,6 +409,8 @@ extern "x86-interrupt" fn page_fault_handler(
     if exit_process {
         scheduler::exit(-2);
     }
+
+    scheduler::schedule();
 }
 
 extern "x86-interrupt" fn general_protection_fault_handler(

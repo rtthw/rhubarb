@@ -432,9 +432,9 @@ define_interrupt_handler_with_context!(|translate_addr_interrupt_handler| {
 });
 
 /// Exit the current process.
-pub fn exit(code: i64) {
+pub fn exit(code: i64) -> ! {
     unsafe {
-        core::arch::asm!("int 0x41", in("rdi") code);
+        core::arch::asm!("int 0x41", in("rdi") code, options(nostack, nomem, noreturn));
     }
 }
 
@@ -472,28 +472,28 @@ impl fmt::Display for Process {
 #[derive(Debug)]
 #[repr(C)]
 pub struct ExecutionContext {
-    registers: CpuRegisters,
-    frame: InterruptStackFrameValue,
+    pub registers: CpuRegisters,
+    pub frame: InterruptStackFrameValue,
 }
 
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct CpuRegisters {
-    r15: u64,
-    r14: u64,
-    r13: u64,
-    r12: u64,
-    r11: u64,
-    r10: u64,
-    r9: u64,
-    r8: u64,
-    rsi: u64,
-    rdi: u64,
-    rbp: u64,
-    rdx: u64,
-    rcx: u64,
-    rbx: u64,
-    rax: u64,
+    pub r15: u64,
+    pub r14: u64,
+    pub r13: u64,
+    pub r12: u64,
+    pub r11: u64,
+    pub r10: u64,
+    pub r9: u64,
+    pub r8: u64,
+    pub rsi: u64,
+    pub rdi: u64,
+    pub rbp: u64,
+    pub rdx: u64,
+    pub rcx: u64,
+    pub rbx: u64,
+    pub rax: u64,
 }
 
 impl CpuRegisters {
