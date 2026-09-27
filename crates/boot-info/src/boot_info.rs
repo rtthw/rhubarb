@@ -151,13 +151,15 @@ pub struct RootObjectInfo {
 
 impl RootObjectInfo {
     pub fn name_str(&self) -> &str {
-        core::str::from_utf8(&self.name).unwrap().trim_matches('\0')
+        core::str::from_utf8(&self.name)
+            .expect("valid UTF-8")
+            .trim_matches('\0')
     }
 }
 
 impl fmt::Debug for RootObjectInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ObjectInfo")
+        f.debug_struct("RootObjectInfo")
             .field("name", &self.name_str())
             .field("addr", &self.addr)
             .field("size", &self.size)

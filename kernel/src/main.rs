@@ -131,23 +131,20 @@ pub struct InitFileSystem {
 
 impl fs::FileSystem for InitFileSystem {
     fn list(&self, dir_path: &str) -> Result<Vec<String>, &'static str> {
+        let prefix = dir_path.strip_prefix("/").unwrap();
         Ok(self
             .root_object_map
             .iter()
-            .filter(|obj| {
-                obj.name_str()
-                    .starts_with(dir_path.strip_prefix("/").unwrap())
-            })
+            .filter(|obj| obj.name_str().starts_with(prefix))
             .map(|obj| format!("/{}.o", obj.name_str()))
             .collect())
     }
 
     fn read(&mut self, path: &str) -> Result<Vec<u8>, &'static str> {
+        let needle = path.strip_prefix("/").unwrap().strip_suffix(".o").unwrap();
         self.root_object_map
             .iter()
-            .find(|obj| {
-                path.strip_prefix("/").unwrap().strip_suffix(".o").unwrap() == obj.name_str()
-            })
+            .find(|obj| obj.name_str() == needle)
             .map(|obj| {
                 let mut bytes = [0].repeat(obj.size);
                 bytes.clone_from_slice(unsafe {
@@ -155,6 +152,6 @@ impl fs::FileSystem for InitFileSystem {
                 });
                 bytes
             })
-            .ok_or("failed to read init object")
+            .ok_or("failed to read object")
     }
 }
